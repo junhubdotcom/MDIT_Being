@@ -1,5 +1,5 @@
 // The `Home` widget is a stateful widget that represents the home page of the application.
-// It includes various functionalities such as sending messages, displaying images, and 
+// It includes various functionalities such as sending messages, displaying images, and
 // interacting with a generative model.
 //
 // The widget uses several packages including:
@@ -64,8 +64,8 @@ class Home extends StatefulWidget {
   State<Home> createState() => _HomeState();
 }
 
-class _HomeState extends State<Home> with TickerProviderStateMixin, AutomaticKeepAliveClientMixin<Home> {
-
+class _HomeState extends State<Home>
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin<Home> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late TabController tabController;
@@ -109,7 +109,8 @@ class _HomeState extends State<Home> with TickerProviderStateMixin, AutomaticKee
         });
       } else {
         if (_controller.text.isNotEmpty) {
-          _addMessage(Message(text: _controller.text, isUser: true, image: image));
+          _addMessage(
+              Message(text: _controller.text, isUser: true, image: image));
           setState(() {
             _isLoading = false;
           });
@@ -163,7 +164,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin, AutomaticKee
       setState(() {
         isFurniture[index] = !isFurniture[index];
       });
-      
+
       //developer.log("Function to change is called");
     } else {
       //developer.log("Index out of range");
@@ -190,7 +191,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin, AutomaticKee
           isRoom[index] = !receivedIndex;
         });
       }
-      
+
       //developer.log("Function to change is called");
     } else {
       //developer.log("Index out of range");
@@ -199,19 +200,20 @@ class _HomeState extends State<Home> with TickerProviderStateMixin, AutomaticKee
 
   // Method to change the value of an element in the list
   void changeTreatStatus(int index) {
-      setState(() {
-        _isEating = !_isEating;
-        Future.delayed(const Duration(seconds: 1), () {
-          setState(() {
-            _isEating = !_isEating;
-          });
+    setState(() {
+      _isEating = !_isEating;
+      Future.delayed(const Duration(seconds: 1), () {
+        setState(() {
+          _isEating = !_isEating;
         });
       });
+    });
   }
 
   @override
   void initState() {
-    _model = GenerativeModel(model: 'gemini-1.5-pro', apiKey: dotenv.env['GOOGLE_API_KEY']!);
+    _model = GenerativeModel(
+        model: 'gemini-2.0-flash', apiKey: dotenv.env['GOOGLE_API_KEY']!);
     _chat = _model.startChat();
 
     tabController = TabController(length: 3, vsync: this);
@@ -234,11 +236,10 @@ class _HomeState extends State<Home> with TickerProviderStateMixin, AutomaticKee
 
   @override
   Widget build(BuildContext context) {
-
-    super.build(context); 
+    super.build(context);
 
     final messages = Provider.of<MessageProvider>(context).messages;
-    final double roomHeight = MediaQuery.of(context).size.height/2;
+    final double roomHeight = MediaQuery.of(context).size.height / 2;
     final double roomWidth = MediaQuery.of(context).size.width;
 
     final randomGif = gifPaths[Random().nextInt(gifPaths.length)];
@@ -251,174 +252,178 @@ class _HomeState extends State<Home> with TickerProviderStateMixin, AutomaticKee
             physics: const ClampingScrollPhysics(),
             child: Column(
               children: [
-                Stack(
-                  children: [ 
-                    Container(
-                      width: roomWidth,
-                      height: roomHeight,
-                      decoration: const BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage('assets/images/empty_room3.jpg'),
-                          fit: BoxFit.fill,
-                        ),
+                Stack(children: [
+                  Container(
+                    width: roomWidth,
+                    height: roomHeight,
+                    decoration: const BoxDecoration(
+                      image: DecorationImage(
+                        image: AssetImage('assets/images/empty_room3.jpg'),
+                        fit: BoxFit.fill,
                       ),
                     ),
-                    isRoom[0]
-                    ? Container(
-                      width: roomWidth,
-                      height: roomHeight,
-                      decoration: const BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage('assets/images/xwall1.png'),
-                          fit: BoxFit.fill,
-                        ),
-                      ),
-                    )
-                    : Container(),
-                    isRoom[1]
-                    ? Container(
-                      width: roomWidth,
-                      height: roomHeight,
-                      decoration: const BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage('assets/images/xwall2.png'),
-                          fit: BoxFit.fill,
-                        ),
-                      ),
-                    )
-                    : Container(),
-                    isRoom[2]
-                    ? Container(
-                      width: roomWidth,
-                      height: roomHeight,
-                      decoration: const BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage('assets/images/xwall3.png'),
-                          fit: BoxFit.fill,
-                        ),
-                      ),
-                    )
-                    : Container(),
-                    isRoom[3]
-                    ? Container(
-                      width: roomWidth,
-                      height: roomHeight,
-                      decoration: const BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage('assets/images/xfloor1.png'),
-                          fit: BoxFit.fill,
-                        ),
-                      ),
-                    )
-                    : Container(),
-                    isRoom[4]
-                    ? Container(
-                      width: roomWidth,
-                      height: roomHeight,
-                      decoration: const BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage('assets/images/xfloor2.png'),
-                          fit: BoxFit.fill,
-                        ),
-                      ),
-                    )
-                    : Container(),
-                    isRoom[5]
-                    ? Container(
-                      width: roomWidth,
-                      height: roomHeight,
-                      decoration: const BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage('assets/images/xfloor3.png'),
-                          fit: BoxFit.fill,
-                        ),
-                      ),
-                    )
-                    : Container(),
-                    isFurniture[5] 
-                    ? Padding(
-                      padding: EdgeInsets.only(top: roomHeight*0.55, left: roomWidth*0.1),
-                      child: const Image(
-                      image: AssetImage('assets/images/plant.png'),
-                      width: 100, 
-                      height: 100, 
-                      ),
-                    )
-                    : Container(),
-                    isFurniture[0]
-                    ? Padding(
-                      padding: EdgeInsets.only(top: roomHeight*0.7, left: roomWidth*0.05),
-                      child: const Image(
-                      image: AssetImage('assets/images/mirror.png'),
-                      width: 100, 
-                      height: 100, 
-                      ),
-                    )
-                    : Container(),
-                    isFurniture[1] 
-                    ? Padding(
-                      padding: EdgeInsets.only(top: roomHeight*0.3, left: roomWidth*0.5),
-                      child: const Image(
-                      image: AssetImage('assets/images/shelf.png'),
-                      width: 100, 
-                      height: 100, 
-                      ),
-                    )
-                    : Container(),
-                    isFurniture[3]
-                    ? Padding(
-                      padding: EdgeInsets.only(top: roomHeight*0.51, left: roomWidth*0.65),
-                      child: const Image(
-                      image: AssetImage('assets/images/lamp.png'),
-                      width: 100, 
-                      height: 100, 
-                      ),
-                    )
-                    : Container(),
-                    isFurniture[4]
-                    ? Padding(
-                      padding: EdgeInsets.only(top: roomHeight*0.6, left: roomWidth*0.5),
-                      child: const Image(
-                      image: AssetImage('assets/images/sofa.png'),
-                      width: 80, 
-                      height: 80, 
-                      ),
-                    )
-                    : Container(),
-                    isFurniture[2]
-                    ? Padding(
-                      padding: EdgeInsets.only(top: roomHeight*0.65, left: roomWidth*0.65),
-                      child: const Image(
-                      image: AssetImage('assets/images/table.png'),
-                      width: 85, 
-                      height: 85, 
-                      ),
-                    )
-                    : Container(),
-                    _isEating
-                    ? Padding(
-                      padding: EdgeInsets.only(top: roomHeight*0.65),
-                      child: const Center(
-                        child: SizedBox(
-                          height: 120,
-                          width: 120,
-                          child: Image(
-                            image: AssetImage('assets/gif/eatdog.gif'),
-                            fit: BoxFit.fitWidth,
+                  ),
+                  isRoom[0]
+                      ? Container(
+                          width: roomWidth,
+                          height: roomHeight,
+                          decoration: const BoxDecoration(
+                            image: DecorationImage(
+                              image: AssetImage('assets/images/xwall1.png'),
+                              fit: BoxFit.fill,
+                            ),
+                          ),
+                        )
+                      : Container(),
+                  isRoom[1]
+                      ? Container(
+                          width: roomWidth,
+                          height: roomHeight,
+                          decoration: const BoxDecoration(
+                            image: DecorationImage(
+                              image: AssetImage('assets/images/xwall2.png'),
+                              fit: BoxFit.fill,
+                            ),
+                          ),
+                        )
+                      : Container(),
+                  isRoom[2]
+                      ? Container(
+                          width: roomWidth,
+                          height: roomHeight,
+                          decoration: const BoxDecoration(
+                            image: DecorationImage(
+                              image: AssetImage('assets/images/xwall3.png'),
+                              fit: BoxFit.fill,
+                            ),
+                          ),
+                        )
+                      : Container(),
+                  isRoom[3]
+                      ? Container(
+                          width: roomWidth,
+                          height: roomHeight,
+                          decoration: const BoxDecoration(
+                            image: DecorationImage(
+                              image: AssetImage('assets/images/xfloor1.png'),
+                              fit: BoxFit.fill,
+                            ),
+                          ),
+                        )
+                      : Container(),
+                  isRoom[4]
+                      ? Container(
+                          width: roomWidth,
+                          height: roomHeight,
+                          decoration: const BoxDecoration(
+                            image: DecorationImage(
+                              image: AssetImage('assets/images/xfloor2.png'),
+                              fit: BoxFit.fill,
+                            ),
+                          ),
+                        )
+                      : Container(),
+                  isRoom[5]
+                      ? Container(
+                          width: roomWidth,
+                          height: roomHeight,
+                          decoration: const BoxDecoration(
+                            image: DecorationImage(
+                              image: AssetImage('assets/images/xfloor3.png'),
+                              fit: BoxFit.fill,
+                            ),
+                          ),
+                        )
+                      : Container(),
+                  isFurniture[5]
+                      ? Padding(
+                          padding: EdgeInsets.only(
+                              top: roomHeight * 0.55, left: roomWidth * 0.1),
+                          child: const Image(
+                            image: AssetImage('assets/images/plant.png'),
+                            width: 100,
+                            height: 100,
+                          ),
+                        )
+                      : Container(),
+                  isFurniture[0]
+                      ? Padding(
+                          padding: EdgeInsets.only(
+                              top: roomHeight * 0.7, left: roomWidth * 0.05),
+                          child: const Image(
+                            image: AssetImage('assets/images/mirror.png'),
+                            width: 100,
+                            height: 100,
+                          ),
+                        )
+                      : Container(),
+                  isFurniture[1]
+                      ? Padding(
+                          padding: EdgeInsets.only(
+                              top: roomHeight * 0.3, left: roomWidth * 0.5),
+                          child: const Image(
+                            image: AssetImage('assets/images/shelf.png'),
+                            width: 100,
+                            height: 100,
+                          ),
+                        )
+                      : Container(),
+                  isFurniture[3]
+                      ? Padding(
+                          padding: EdgeInsets.only(
+                              top: roomHeight * 0.51, left: roomWidth * 0.65),
+                          child: const Image(
+                            image: AssetImage('assets/images/lamp.png'),
+                            width: 100,
+                            height: 100,
+                          ),
+                        )
+                      : Container(),
+                  isFurniture[4]
+                      ? Padding(
+                          padding: EdgeInsets.only(
+                              top: roomHeight * 0.6, left: roomWidth * 0.5),
+                          child: const Image(
+                            image: AssetImage('assets/images/sofa.png'),
+                            width: 80,
+                            height: 80,
+                          ),
+                        )
+                      : Container(),
+                  isFurniture[2]
+                      ? Padding(
+                          padding: EdgeInsets.only(
+                              top: roomHeight * 0.65, left: roomWidth * 0.65),
+                          child: const Image(
+                            image: AssetImage('assets/images/table.png'),
+                            width: 85,
+                            height: 85,
+                          ),
+                        )
+                      : Container(),
+                  _isEating
+                      ? Padding(
+                          padding: EdgeInsets.only(top: roomHeight * 0.65),
+                          child: const Center(
+                            child: SizedBox(
+                              height: 120,
+                              width: 120,
+                              child: Image(
+                                image: AssetImage('assets/gif/eatdog.gif'),
+                                fit: BoxFit.fitWidth,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Padding(
+                          padding: EdgeInsets.only(top: roomHeight * 0.65),
+                          child: Center(
+                            child: Image(
+                              image: AssetImage(randomGif),
+                            ),
                           ),
                         ),
-                      ),
-                    )
-                    : Padding(
-                      padding: EdgeInsets.only(top: roomHeight*0.65),
-                      child: Center(
-                        child: Image(
-                          image: AssetImage(randomGif),
-                        ),
-                      ),
-                    ),
-                  ]
-                ),
+                ]),
                 Container(
                   width: MediaQuery.of(context).size.width,
                   height: 1,
@@ -428,99 +433,113 @@ class _HomeState extends State<Home> with TickerProviderStateMixin, AutomaticKee
                 ),
                 SizedBox(
                   width: MediaQuery.of(context).size.width,
-                  height: MediaQuery.of(context).size.height*0.43 - MediaQuery.of(context).size.height*0.03,
+                  height: MediaQuery.of(context).size.height * 0.43 -
+                      MediaQuery.of(context).size.height * 0.03,
                   child: Column(
                     children: [
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.only(top: 10.0),
-                            child: ListView.builder(
-                              controller: _scrollController,
-                              itemCount: messages.length,
-                              itemBuilder: (context, index) {
+                          child: ListView.builder(
+                            controller: _scrollController,
+                            itemCount: messages.length,
+                            itemBuilder: (context, index) {
                               final message = messages[index];
                               return ListTile(
                                 title: Align(
-                                alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
-                                child: Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                  color: message.isUser ? primary : tertiary,
-                                  borderRadius: message.isUser
-                                    ? const BorderRadius.only(
-                                      topLeft: Radius.circular(20),
-                                      bottomRight: Radius.circular(20),
-                                      bottomLeft: Radius.circular(20))
-                                    : const BorderRadius.only(
-                                      topRight: Radius.circular(20),
-                                      topLeft: Radius.circular(20),
-                                      bottomRight: Radius.circular(20)),
-                                  ),
-                                  child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (message.image != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 8.0),
-                                      child: Image.file(
-                                      File(message.image!.path),
-                                      height: 100,
-                                      width: 100,
-                                      fit: BoxFit.contain,
-                                      ),
+                                  alignment: message.isUser
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          message.isUser ? primary : tertiary,
+                                      borderRadius: message.isUser
+                                          ? const BorderRadius.only(
+                                              topLeft: Radius.circular(20),
+                                              bottomRight: Radius.circular(20),
+                                              bottomLeft: Radius.circular(20))
+                                          : const BorderRadius.only(
+                                              topRight: Radius.circular(20),
+                                              topLeft: Radius.circular(20),
+                                              bottomRight: Radius.circular(20)),
                                     ),
-                                    Text(message.text),
-                                  ],
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (message.image != null)
+                                          Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 8.0),
+                                            child: Image.file(
+                                              File(message.image!.path),
+                                              height: 100,
+                                              width: 100,
+                                              fit: BoxFit.contain,
+                                            ),
+                                          ),
+                                        Text(message.text),
+                                      ],
+                                    ),
                                   ),
-                                ),
                                 ),
                               );
-                              },
-                            ),
+                            },
+                          ),
                         ),
                       ),
                       image != null
-                      ? Padding(
-                        padding: const EdgeInsets.only(top: 6.0),
-                        child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                height: 100,
-                                width: 100,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.grey.withOpacity(0.5), width: 1)
-                                ),
-                                child: Image.file(File(image!.path), fit: BoxFit.contain,) 
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: 6.0),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                      height: 100,
+                                      width: 100,
+                                      decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          border: Border.all(
+                                              color:
+                                                  Colors.grey.withOpacity(0.5),
+                                              width: 1)),
+                                      child: Image.file(
+                                        File(image!.path),
+                                        fit: BoxFit.contain,
+                                      )),
+                                  IconButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        image = null;
+                                      });
+                                    },
+                                    icon: const Icon(
+                                      Icons.cancel,
+                                      size: 30,
+                                    ),
+                                  )
+                                ],
                               ),
-                              IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    image = null;
-                                  });
-                                }, 
-                                icon: const Icon(Icons.cancel, size: 30,),
-                              )
-                            ],
-                          ),
-                      ) : Container(),
+                            )
+                          : Container(),
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 15,top: 10, left: 16.0, right: 16),
+                        padding: const EdgeInsets.only(
+                            bottom: 15, top: 10, left: 16.0, right: 16),
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.5),
-                                spreadRadius: 3,
-                                blurRadius: 7,
-                                offset: const Offset(0, 3)
-                              )
-                            ]
-                          ),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                    color: Colors.grey.withOpacity(0.5),
+                                    spreadRadius: 3,
+                                    blurRadius: 7,
+                                    offset: const Offset(0, 3))
+                              ]),
                           child: Row(
                             children: [
                               Expanded(
@@ -528,39 +547,42 @@ class _HomeState extends State<Home> with TickerProviderStateMixin, AutomaticKee
                                   controller: _controller,
                                   style: Theme.of(context).textTheme.titleSmall,
                                   decoration: InputDecoration(
-                                    hintText: 'Write your message',
-                                    hintStyle: Theme.of(context).textTheme.titleSmall!.copyWith(
-                                      color: Colors.grey
-                                    ),
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 20)
-                                  ),
+                                      hintText: 'Write your message',
+                                      hintStyle: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall!
+                                          .copyWith(color: Colors.grey),
+                                      border: InputBorder.none,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 20)),
                                 ),
                               ),
-                              const SizedBox(width: 8,),
+                              const SizedBox(
+                                width: 8,
+                              ),
                               /*IconButton(
                                   icon: const Icon(Icons.camera_alt),
                                   onPressed: callGeminiModel,
                               ),*/
                               IconButton(
-                                  icon: const Icon(Icons.image),
-                                  onPressed: imagePickerMethod,
+                                icon: const Icon(Icons.image),
+                                onPressed: imagePickerMethod,
                               ),
-                              _isLoading ?
-                              const Padding(
-                                padding: EdgeInsets.only(right: 15.0),
-                                child: SizedBox(
-                                  height: 18.0,
-                                  width: 18.0,
-                                  child: Center(
-                                    child: CircularProgressIndicator()
-                                  ),
-                                ),
-                              ) :
-                              IconButton(
-                                  icon: const Icon(Icons.send),
-                                  onPressed: callGeminiModel,
-                              ),
+                              _isLoading
+                                  ? const Padding(
+                                      padding: EdgeInsets.only(right: 15.0),
+                                      child: SizedBox(
+                                        height: 18.0,
+                                        width: 18.0,
+                                        child: Center(
+                                            child: CircularProgressIndicator()),
+                                      ),
+                                    )
+                                  : IconButton(
+                                      icon: const Icon(Icons.send),
+                                      onPressed: callGeminiModel,
+                                    ),
                             ],
                           ),
                         ),
@@ -571,90 +593,109 @@ class _HomeState extends State<Home> with TickerProviderStateMixin, AutomaticKee
               ],
             ),
           ),
-          _isOpen == true ? Container() :
-          SlidingUpPanel(
-            minHeight: MediaQuery.of(context).size.height*0.03,
-            maxHeight: MediaQuery.of(context).size.height*0.43,
-            panel: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white, // background color of panel
-                borderRadius: BorderRadius.only(topLeft: Radius.circular(12.0), topRight: Radius.circular(12.0),), // rounded corners of panel
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const BarIndicator(),
-                  Container(
+          _isOpen == true
+              ? Container()
+              : SlidingUpPanel(
+                  minHeight: MediaQuery.of(context).size.height * 0.03,
+                  maxHeight: MediaQuery.of(context).size.height * 0.43,
+                  panel: Container(
                     decoration: const BoxDecoration(
-                      color: Colors.white
+                      color: Colors.white, // background color of panel
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(12.0),
+                        topRight: Radius.circular(12.0),
+                      ), // rounded corners of panel
                     ),
-                    child: TabBar(
-                      controller: tabController,
-                      labelColor: Colors.black,
-                      unselectedLabelColor: Colors.grey,
-                      labelStyle: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      indicatorColor: Colors.black,
-                      dividerColor: Colors.transparent,
-                      tabs: const [
-                        Tab(text: 'Furnitures'),
-                        Tab(text: 'Designs'),
-                        Tab(text: 'Treats'),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: MediaQuery.of(context).size.width,
-                    height: 1,
-                    decoration: const BoxDecoration(
-                      color: Colors.grey,
-                    ),
-                  ),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                      color: background,
-                      ),
-                      child: TabBarView(
-                      controller: tabController,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Inventory(tabIndex: 0, onTap: changeFurnitureStatus,),
-                        Inventory(tabIndex: 1, onTap: changeRoomStatus,),
-                        Inventory(tabIndex: 2, onTap: changeTreatStatus,),
+                        const BarIndicator(),
+                        Container(
+                          decoration: const BoxDecoration(color: Colors.white),
+                          child: TabBar(
+                            controller: tabController,
+                            labelColor: Colors.black,
+                            unselectedLabelColor: Colors.grey,
+                            labelStyle: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            indicatorColor: Colors.black,
+                            dividerColor: Colors.transparent,
+                            tabs: const [
+                              Tab(text: 'Furnitures'),
+                              Tab(text: 'Designs'),
+                              Tab(text: 'Treats'),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          width: MediaQuery.of(context).size.width,
+                          height: 1,
+                          decoration: const BoxDecoration(
+                            color: Colors.grey,
+                          ),
+                        ),
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: background,
+                            ),
+                            child: TabBarView(
+                              controller: tabController,
+                              children: [
+                                Inventory(
+                                  tabIndex: 0,
+                                  onTap: changeFurnitureStatus,
+                                ),
+                                Inventory(
+                                  tabIndex: 1,
+                                  onTap: changeRoomStatus,
+                                ),
+                                Inventory(
+                                  tabIndex: 2,
+                                  onTap: changeTreatStatus,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
+                    ),
+                  ),
+                  collapsed: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(12.0),
+                        topRight: Radius.circular(12.0),
                       ),
                     ),
+                    child: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        BarIndicator(),
+                      ],
                     ),
-                ],
-              ),
+                  ),
+                ),
+          Positioned(
+            top: 40,
+            left: 16,
+            child: FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const AgentTestScreen()),
+                );
+              },
+              backgroundColor: Colors.blue,
+              child: const Icon(Icons.psychology, color: Colors.white),
+              tooltip: 'Test Being Agent',
             ),
-            collapsed: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(topLeft: Radius.circular(12.0), topRight: Radius.circular(12.0),),
-              ),
-              child: const Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  BarIndicator(),
-                ],
-              ),
-            ),
-          )
+          ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AgentTestScreen()),
-          );
-        },
-        backgroundColor: Colors.blue,
-        child: const Icon(Icons.psychology, color: Colors.white),
-        tooltip: 'Test Being Agent',
       ),
     );
   }
@@ -683,7 +724,8 @@ class BarIndicator extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(10),
       child: Container(
-        width: 40, height: 3,
+        width: 40,
+        height: 3,
         decoration: const BoxDecoration(
           color: Colors.black,
           borderRadius: BorderRadius.all(Radius.circular(10)),
