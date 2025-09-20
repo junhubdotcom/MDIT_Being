@@ -1,0 +1,54 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:hackathon_x_project/backend/colour.dart';
+import 'package:hackathon_x_project/backend/message_provider.dart';
+import 'package:hackathon_x_project/backend/being_agent_service.dart';
+import 'package:hackathon_x_project/page/onboardingscreen.dart';
+import 'package:provider/provider.dart';
+
+// The main function is the entry point of the application.
+void main() async {
+  // Ensure Flutter binding is initialized
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load environment variables from the .env file.
+  await dotenv.load(fileName: ".env");
+
+  // Initialize Being Agent Service
+  print('Initializing Being Agent Service...');
+  bool agentServiceReady = await BeingAgentService.initialize();
+  if (agentServiceReady) {
+    print('✅ Being Agent Service is ready - Google Gemini API replacement active');
+  } else {
+    print('⚠️ Being Agent Service not available - check if agent server is running');
+    print('   Start agent server with: python agent/flask_server.py');
+  }
+
+  // Run the Flutter application.
+  runApp(
+    ChangeNotifierProvider(
+      // Create an instance of MessageProvider.
+      create: (context) => MessageProvider(),
+      // Pass MyApp as the child widget.
+      child: const MyApp(),
+    ),
+  );
+}
+
+// MyApp is the root widget of the application.
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  // Build the widget tree for the application.
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      // Set the theme for the application.
+      theme: ThemeData(
+        scaffoldBackgroundColor: background,
+      ),
+      // Set the home screen of the application.
+      home: const OnboardingScreen(),
+    );
+  }
+}
