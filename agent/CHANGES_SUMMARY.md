@@ -14,7 +14,7 @@ Modified the Being emotional tracking agent system to implement a coordinator wo
 - Changed from using `journal_agent, mood_agent` as sub-agents to importing their individual tools
 - Modified imports to: `from .subagent.journal_agent import summarize_text, save_diary`
 - Modified imports to: `from .subagent.mood_agent import analyze_sentiment, append_mood_point`
-- Switched from `model="gemini-2.0-flash"` to `model=LiteLlm(model="openai/llama3.2")` for local Ollama execution
+ - Standardized on `model="gemini-2.0-flash"` using Google AI Studio; removed Ollama/LiteLLM references
 - Updated instruction to focus on tool usage instead of agent delegation
 - Changed `tools=[]` to `tools=[summarize_text, save_diary, analyze_sentiment, append_mood_point]`
 - Changed `sub_agents=[mood_agent, journal_agent]` to `sub_agents=[]`
@@ -31,7 +31,7 @@ Modified the Being emotional tracking agent system to implement a coordinator wo
 **AFTER:** Service agent with exposed tools for main agent
 
 **Key Changes:**
-- Model still set to "gemini-2.0-flash" (commented out LiteLLM)
+- Model set to "gemini-2.0-flash"
 - Updated instruction to be service-oriented: "You are JournalAgent - a service for the Being Buddy agent"
 - Modified to work as a service that doesn't chat directly with users
 - Added structured response format requirements
@@ -76,7 +76,7 @@ Modified the Being emotional tracking agent system to implement a coordinator wo
 ## Technical Architecture
 
 ### Models Used:
-- **Main Agent**: LiteLLM with Ollama llama3.2 (local, cost-free)
+- **Main Agent**: Google AI Studio, model: gemini-2.0-flash
 - **Sub-agents**: Still configured for Gemini (but not used in new workflow)
 
 ### Tools Available to Main Agent:
@@ -99,7 +99,7 @@ Modified the Being emotional tracking agent system to implement a coordinator wo
 
 ## Status
 - ✅ Code changes implemented
-- ✅ Local Ollama integration maintained
+- ✅ Removed Ollama integration for a simpler, single-provider setup
 - ✅ Coordinator pattern established
 - ⚠️ Testing needed to verify workflow functions as expected
 - ⚠️ Sub-agent models still on Gemini (not critical since main agent handles everything)

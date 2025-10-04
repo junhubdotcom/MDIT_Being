@@ -1,7 +1,6 @@
 import uuid
 import datetime
 from google.adk.agents import Agent
-#from google.adk.models.lite_llm import LiteLlm
 
 # Simple in-memory storage for MVP (replace with database later)
 DIARIES = {}
@@ -106,7 +105,6 @@ def create_event_detail_json(conversation: str, user_id: str) -> dict:
 journal_agent = Agent(
     name="journal_agent",
     model="gemini-2.0-flash",
-    #model=LiteLlm(model="openai/llama3.2"),  # Using OpenAI provider format for Ollama
     description=("Summarizes conversation into diary entries and creates EventDetail JSON for the buddy agent."),
     instruction=(
         "You are JournalAgent - a service for the Being Buddy agent. "

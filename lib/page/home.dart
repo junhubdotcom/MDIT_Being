@@ -211,7 +211,7 @@ class _HomeState extends State<Home> with TickerProviderStateMixin, AutomaticKee
 
   @override
   void initState() {
-    _model = GenerativeModel(model: 'gemini-1.5-pro', apiKey: dotenv.env['GOOGLE_API_KEY']!);
+    _model = GenerativeModel(model: 'gemini-2.0-flash', apiKey: dotenv.env['GOOGLE_API_KEY']!);
     _chat = _model.startChat();
 
     tabController = TabController(length: 3, vsync: this);

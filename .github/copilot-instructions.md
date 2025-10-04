@@ -16,7 +16,7 @@
 - **Backend (Python):**
   - Use a virtual environment (`.venv`). Activate before running/installing anything.
   - Install dependencies: `pip install -r requirements.txt` (in `agent/`).
-  - For local LLMs, install and run Ollama (`ollama serve`). Download models as needed (`ollama pull llama3.2`).
+  
   - Start the Flask server: `python flask_server.py` (runs on `localhost:5000`).
   - Test endpoints with `curl` or Postman (see `README.md` for example payloads).
 - **Frontend (Flutter):**
@@ -30,7 +30,7 @@
 - **EventDetail JSON:**
   - All conversation analysis returns a standard JSON structure with `title`, `description`, `emoji_path`, and `timestamp`.
 - **Environment Variables:**
-  - Use `.env` in `agent/` to configure API keys and model endpoints. Ollama is default for local dev.
+  - Use `.env` in `agent/` to configure API keys for Google AI Studio.
 - **Crisis Detection:**
   - `mood_agent.py` auto-detects crisis language and triggers supportive responses.
 - **No persistent storage** (MVP):
@@ -41,10 +41,10 @@
   - `POST /analyze_conversation`: Main entry for chat analysis from Flutter.
   - `GET /health`: Health check for backend status.
 - **Model Switching:**
-  - Change model source (Ollama vs. Google AI Studio) by editing the `model` parameter in agent/sub-agent files and updating `.env`.
+  - Models are served from Google AI Studio; ensure `model="gemini-2.0-flash"` in agent/sub-agent files.
 
 ## Troubleshooting
-- Ensure Ollama is running and the correct model is downloaded for local dev.
+- Ensure your Google AI Studio API key is set in `.env` and network is available.
 - Activate the Python virtual environment before running backend commands.
 - Check `.env` for correct API keys and endpoints if using Google AI Studio.
 - Use debug commands in `agent/README.md` to verify agent and sub-agent loading.

@@ -1,5 +1,4 @@
 from google.adk.agents import Agent
-#from google.adk.models.lite_llm import LiteLlm
 
 # Simple in-memory storage for MVP (replace with database later)
 MOODS = {}
@@ -98,7 +97,6 @@ def get_emoji_for_sentiment(text: str) -> dict:
 mood_agent = Agent(
     name="mood_agent",
     model="gemini-2.0-flash",
-    #model=LiteLlm(model="openai/llama3.2"),  # Using OpenAI provider format for Ollama
     description=("Performs sentiment analysis, mood tracking, and emoji selection for the buddy agent."),
     instruction=(
         "You are MoodAgent - a service for the Being Buddy agent. "

@@ -1,7 +1,7 @@
 # Being Agent Flutter Integration Complete 🎉
 
 ## Summary
-Successfully integrated the Being emotional tracking agent system with the Flutter app, replacing Google Gemini API calls with free local Ollama agents while maintaining the same functionality.
+Successfully integrated the Being emotional tracking agent system with the Flutter app using Google AI Studio (Gemini) while maintaining the same functionality.
 
 ## 🔄 Changes Made
 
@@ -32,7 +32,7 @@ Successfully integrated the Being emotional tracking agent system with the Flutt
 
 #### **agent/requirements.txt** (New)
 - ✅ Added Flask, Flask-CORS, and all necessary dependencies
-- ✅ Specified version compatibility for Google ADK and LiteLLM
+- ✅ Specified version compatibility for Google ADK and Google Generative AI
 
 ### 2. Flutter App Updates
 
@@ -78,8 +78,7 @@ Successfully integrated the Being emotional tracking agent system with the Flutt
 ```bash
 cd Being/agent
 pip install -r requirements.txt
-ollama pull llama3.2
-ollama serve
+python -m agent.fastapi_server
 python flask_server.py
 ```
 
@@ -98,7 +97,7 @@ python test_integration.py
 
 ## 💰 Cost Savings
 - **Before**: Google Gemini API calls cost money per analysis
-- **After**: Free local Ollama models (llama3.2, gemma3:1b, deepseek-r1)
+- **After**: Google AI Studio (gemini-2.0-flash)
 - **Same functionality**: Title generation, diary descriptions, mood analysis, emoji selection
 
 ## 🔧 Architecture Flow

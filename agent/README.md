@@ -30,18 +30,16 @@ pip install -r requirements.txt
 ```bash
 # Copy and edit environment file
 cp .env.example .env
-# Add your GOOGLE_API_KEY if using Gemini (optional with Ollama)
+# Add your GOOGLE_API_KEY for Gemini
 ```
 
-### 3. Start Ollama (for free local models)
-```bash
-ollama pull llama3.2
-ollama serve
-```
+<!-- Ollama setup removed as the project now uses Google AI Studio exclusively. -->
 
 ### 4. Start FastAPI Server
+Run from the project root so Python treats `agent` as a package (prevents relative import errors):
 ```bash
-python fastapi_server.py
+# From the project root (folder that contains the `agent/` directory)
+python -m agent.fastapi_server
 # Server runs on http://localhost:8000
 # API docs available at http://localhost:8000/docs
 ```
@@ -76,7 +74,7 @@ The FastAPI server provides these endpoints for the Flutter app:
 
 ### Root Agent: Being Buddy
 - **Name**: `being_buddy_agent`
-- **Model**: `ollama://llama3.2` (free local model) or `gemini-2.0-flash` (paid API)
+- **Model**: `gemini-2.0-flash`
 - **Role**: Empathetic conversational companion and task orchestrator
 - **Capabilities**: 
   - Provides emotional support and validation
@@ -86,7 +84,7 @@ The FastAPI server provides these endpoints for the Flutter app:
 ### Sub-Agents
 
 #### 1. Journal Agent (`journal_agent`)
-- **Model**: `ollama://llama3.2` (default) or configurable
+- **Model**: `gemini-2.0-flash`
 - **Purpose**: Conversation summarization and diary management
 - **Tools**:
   - `summarize_text()`: Creates 1-2 sentence summaries of conversations
@@ -94,7 +92,7 @@ The FastAPI server provides these endpoints for the Flutter app:
 - **Storage**: In-memory dictionary (MVP - can be replaced with database)
 
 #### 2. Mode Agent (`mode_agent`) 
-- **Model**: `ollama://llama3.2` (default) or configurable
+- **Model**: `gemini-2.0-flash`
 - **Purpose**: Sentiment analysis and mood timeline tracking
 - **Tools**:
   - `analyze_sentiment()`: Analyzes emotional content and assigns scores (-1 to 1)
@@ -110,48 +108,9 @@ The FastAPI server provides these endpoints for the Flutter app:
 - Python 3.9+
 - Google ADK (Agent Development Kit)
 - **Option 1**: Google AI Studio API key (paid) OR
-- **Option 2**: Ollama (free local models) - **Recommended for development**
+<!-- Ollama option removed: Project standardized on Google AI Studio. -->
 
-### Ollama Setup (Free Option - Recommended)
-
-**Why Ollama?** Run models locally for free during development, no API costs!
-
-1. **Install Ollama**:
-   - Download from [ollama.ai](https://ollama.ai)
-   - Or via command line:
-   ```bash
-   # Windows (PowerShell as Administrator)
-   winget install Ollama.Ollama
-   
-   # macOS
-   brew install ollama
-   
-   # Linux
-   curl -fsSL https://ollama.ai/install.sh | sh
-   ```
-
-2. **Download a model** (we recommend Llama 3.2 for good performance):
-   ```bash
-   # Download Llama 3.2 (3B parameters - good balance of speed/quality)
-   ollama pull llama3.2
-   
-   # Alternative: Smaller/faster model
-   ollama pull llama3.2:1b
-   
-   # Alternative: Larger/better model (if you have good hardware)
-   ollama pull llama3.1:8b
-   ```
-
-3. **Start Ollama service**:
-   ```bash
-   ollama serve
-   ```
-   Keep this running in a separate terminal.
-
-4. **Verify installation**:
-   ```bash
-   ollama list  # Should show your downloaded models
-   ```
+<!-- Ollama setup removed. -->
 
 ### Google AI Studio Setup (Paid Option)
 
@@ -187,19 +146,13 @@ source .venv/bin/activate
 
 ### Dependencies
 ```bash
-# Install ADK (make sure virtual environment is activated)
-pip install google-adk
+# Install ADK and related packages (ensure virtual environment is activated)
+pip install -r agent/requirements.txt
 ```
 
 ### Environment Setup
 
-**For Ollama (Free - Default Setup)**:
-The agent is configured to use `LiteLlm(model="openai/llama3.2")` with these environment variables:
-```env
-OPENAI_API_BASE=http://localhost:11434/v1
-OPENAI_API_KEY=anything
-```
-No additional setup needed if Ollama is running!
+<!-- Ollama environment variables removed. -->
 
 **For Google AI Studio (Paid)**:
 1. Create a `.env` file in the agent directory with your API credentials:
@@ -209,16 +162,11 @@ GOOGLE_API_KEY=your_google_api_key_here
 ```
 
 2. Get an API key from [Google AI Studio](https://aistudio.google.com/apikey)
-3. Update agent models in `agent.py` and subagent files to use `"gemini-2.0-flash"` instead of `"ollama://llama3.2"`
+3. Ensure agent models in `agent.py` and subagent files use `"gemini-2.0-flash"`
 
 ## 🚀 How to Start
 
 ### Prerequisites
-**For Ollama**: Make sure Ollama is running in a separate terminal:
-```bash
-ollama serve
-```
-
 Make sure your virtual environment is activated before running any commands:
 ```bash
 # Windows PowerShell
@@ -239,26 +187,11 @@ cd "path/to/Being"
 # Activate virtual environment (if not already active)
 .venv\Scripts\Activate.ps1  # Windows PowerShell
 
-# Run the agent in terminal mode
-adk run agent
+# Run the FastAPI service (module execution)
+python -m agent.fastapi_server
 ```
 
-### Method 2: Web UI (Recommended)
-```bash
-# Navigate to the Being project directory  
-cd "path/to/Being"
-
-# Activate virtual environment (if not already active)
-.venv\Scripts\Activate.ps1  # Windows PowerShell
-
-# Launch the interactive web interface
-adk web
-```
-
-Then:
-1. Open your browser to the provided URL (usually `http://localhost:8000`)
-2. Select "agent" from the dropdown menu
-3. Start chatting with Being Buddy!
+<!-- ADK web UI removed for simplicity. The service is exposed via FastAPI. -->
 
 ## 🎯 Capabilities & Triggers
 
@@ -332,28 +265,8 @@ Edit `subagent/journal_agent.py`:
 summary = s if len(s) <= 240 else s[:237] + "..."  # Adjust character limit
 ```
 
-#### Switch Between Ollama and Google AI Studio
-To switch from Ollama to Google AI Studio (or vice versa), update the `model` parameter in:
-- `agent.py` (root_agent)
-- `subagent/journal_agent.py` (journal_agent)  
-- `subagent/mode_agent.py` (mode_agent)
-
-**For Ollama (free)**:
-```python
-model=LiteLlm(model="openai/llama3.2")
-```
-
-**For Google AI Studio (paid)**:
-```python
-model="gemini-2.0-flash"
-```
-
-**Available Ollama Models** (download with `ollama pull <model>`):
-- `llama3.2:1b` - Fastest, smallest (1B parameters)
-- `llama3.2` - Balanced (3B parameters) - **Recommended**
-- `llama3.1:8b` - Better quality, slower (8B parameters)
-- `codellama` - Good for technical discussions
-- `phi3` - Microsoft's efficient model
+#### Model selection
+The project uses Google AI Studio with `model="gemini-2.0-flash"` across the root agent and sub-agents.
 
 #### Update System Prompts
 Modify the `instruction` field in `agent.py` to change Being Buddy's behavior.
@@ -369,17 +282,16 @@ Modify the `instruction` field in `agent.py` to change Being Buddy's behavior.
 
 ### Common Issues
 
-1. **Ollama Issues**:
-   - Make sure Ollama is running: `ollama serve` in a separate terminal
-   - Verify model is downloaded: `ollama list`
-   - If model not found, download it: `ollama pull llama3.2`
+<!-- Ollama troubleshooting removed. -->
 
 2. **Virtual Environment Issues**: 
    - Make sure virtual environment is activated (prompt should show `(.venv)`)
    - If packages not found, reinstall with `pip install google-adk`
    - To deactivate virtual environment: `deactivate`
 
-3. **Import Errors**: Ensure you're running from the correct directory and all files are present
+3. **Import Errors**: Ensure you run the server as a module from the project root:
+  - Correct: `python -m agent.fastapi_server` (run from the folder that contains `agent/`)
+  - Incorrect: `python agent/fastapi_server.py` (may cause "attempted relative import" errors)
 
 4. **API Key Issues**: Verify your `.env` file is configured correctly (only needed for Google AI Studio)
 
@@ -390,11 +302,7 @@ Modify the `instruction` field in `agent.py` to change Being Buddy's behavior.
 # Check if agent loads correctly
 python -c "from agent import root_agent; print('Success!')"
 
-# Check Ollama connection
-ollama list
-
-# Test a model directly
-ollama run llama3.2 "Hello, how are you?"
+<!-- Ollama debug commands removed. -->
 
 # View agent configuration
 adk web --debug
