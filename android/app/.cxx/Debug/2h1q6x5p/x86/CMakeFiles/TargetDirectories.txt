@@ -1,0 +1,2 @@
+C:/Users/furno/Desktop/MDIT PowerBi/Being/android/app/.cxx/Debug/2h1q6x5p/x86/CMakeFiles/edit_cache.dir
+C:/Users/furno/Desktop/MDIT PowerBi/Being/android/app/.cxx/Debug/2h1q6x5p/x86/CMakeFiles/rebuild_cache.dir
