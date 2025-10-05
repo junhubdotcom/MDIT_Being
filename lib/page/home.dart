@@ -43,10 +43,12 @@
 
 import 'dart:io';
 import 'dart:math';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 import 'package:hackathon_x_project/backend/colour.dart';
 import 'package:hackathon_x_project/page/agent_test_screen.dart';
 import 'package:hackathon_x_project/widget/inventory.dart';
@@ -83,29 +85,45 @@ class _HomeState extends State<Home>
   ];
   bool _isEating = false;
 
-  late final GenerativeModel _model;
-  late final ChatSession _chat;
+  GenerativeModel? _model;
+  late final String _backendBaseUrl;
+  late final String _userId;
+
+  Future<String> _sendToAgent(String text) async {
+    final uri = Uri.parse('$_backendBaseUrl/chat');
+    final payload = {
+      'user_id': _userId,
+      'conversation': text,
+    };
+    final res = await http.post(
+      uri,
+      headers: { 'Content-Type': 'application/json' },
+      body: jsonEncode(payload),
+    );
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final msg = data['response'] as String?;
+      if (msg == null || msg.isEmpty) {
+        throw Exception('Empty response from agent');
+      }
+      return msg;
+    } else {
+      throw Exception('Agent error ${res.statusCode}: ${res.body}');
+    }
+  }
 
   callGeminiModel() async {
     try {
       //developer.log("callGeminiModel was run");
       if (image == null) {
-        if (_controller.text.isNotEmpty) {
-          _addMessage(Message(text: _controller.text, isUser: true));
-          setState(() {
-            _isLoading = false;
-          });
-        }
-
+        if (_controller.text.isEmpty) return;
         final prompt = _controller.text.trim();
-        final content = Content.text(prompt);
-        final response = await _chat.sendMessage(content);
-
+        _addMessage(Message(text: prompt, isUser: true));
+        setState(() { _isLoading = true; });
+        final agentReply = await _sendToAgent(prompt);
         setState(() {
-          _addMessage(Message(text: response.text!, isUser: false));
-          setState(() {
-            _isLoading = false;
-          });
+          _addMessage(Message(text: agentReply, isUser: false));
+          _isLoading = false;
         });
       } else {
         if (_controller.text.isNotEmpty) {
@@ -119,7 +137,10 @@ class _HomeState extends State<Home>
         final prompt = _controller.text.trim();
         final imagePart = await image!.readAsBytes();
         final mimetype = image?.mimeType ?? 'image/jpeg';
-        final response = await _model.generateContent([
+        if (_model == null) {
+          _addMessage(Message(text: 'Image+prompt not available: missing GOOGLE_API_KEY', isUser: false));
+        } else {
+          final response = await _model!.generateContent([
           Content.multi([TextPart(prompt), DataPart(mimetype, imagePart)])
         ]);
 
@@ -129,6 +150,7 @@ class _HomeState extends State<Home>
             _isLoading = false;
           });
         });
+        }
       }
 
       _controller.clear();
@@ -212,8 +234,15 @@ class _HomeState extends State<Home>
 
   @override
   void initState() {
-    _model = GenerativeModel(model: 'gemini-2.0-flash', apiKey: dotenv.env['GOOGLE_API_KEY']!);
-    _chat = _model.startChat();
+    _backendBaseUrl = dotenv.env['BACKEND_BASE_URL'] ?? (Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
+    _userId = dotenv.env['USER_ID'] ?? 'u1';
+    // Keep GenerativeModel for image+prompt generation path (backend currently text-only)
+    final apiKey = dotenv.env['GOOGLE_API_KEY'];
+    if (apiKey != null && apiKey.isNotEmpty) {
+      _model = GenerativeModel(model: 'gemini-2.0-flash', apiKey: apiKey);
+    } else {
+      _model = null;
+    }
 
     tabController = TabController(length: 3, vsync: this);
 

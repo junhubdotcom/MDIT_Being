@@ -1,6 +1,6 @@
 """
-Being Agent FastAPI Server
-Based on Google ADK best practices for Flutter integration
+Being Agent FastAPI Server (simplified)
+Root agent only: health + chat
 """
 
 import os
@@ -9,24 +9,42 @@ import asyncio
 import warnings
 from pathlib import Path
 from dotenv import load_dotenv
+import traceback
 from datetime import datetime
 
-from google.genai.types import Part, Content
 from google.adk.runners import InMemoryRunner
+from google.adk.agents import LiveRequestQueue
 from google.adk.agents.run_config import RunConfig
+try:
+    # Prefer enum to satisfy Pydantic expected enum type
+    from google.adk.agents.run_config import ResponseModality
+    _HAS_ENUM = True
+except Exception:
+    ResponseModality = None
+    _HAS_ENUM = False
 from google.genai import types
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# Import our Being agent
-from agent import root_agent
+# Ensure package context when running this file directly (python fastapi_server.py)
+if __name__ == "__main__" and (__package__ is None or __package__ == ""):
+    import os as _os, sys as _sys
+    _sys.path.append(_os.path.dirname(_os.path.dirname(__file__)))
+    __package__ = "agent"
 
-warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+from . import root_agent
 
 # Load environment variables
 load_dotenv()
+
+# Check for GOOGLE_API_KEY
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if GOOGLE_API_KEY:
+    print("GOOGLE_API_KEY is set.")
+else:
+    print("⚠️  GOOGLE_API_KEY is not set. ADK calls will fail; requests will return HTTP 500.")
 
 APP_NAME = "Being Agent Service"
 
@@ -46,13 +64,6 @@ class ConversationRequest(BaseModel):
     conversation: str
     user_id: str
 
-class EventDetailResponse(BaseModel):
-    title: str
-    description: str
-    emoji_path: str
-    timestamp: str
-    agent_response: str = ""
-
 class HealthResponse(BaseModel):
     status: str
     service: str
@@ -60,6 +71,17 @@ class HealthResponse(BaseModel):
 
 # Global runner instance
 runner = None
+
+def now_utc_z() -> str:
+    # Use timezone-aware UTC datetime and format with trailing Z
+    try:
+        # Python 3.11+
+        ts = datetime.now(datetime.UTC).isoformat()
+    except Exception:
+        # Fallback for environments without datetime.UTC
+        from datetime import timezone as _tz
+        ts = datetime.now(_tz.utc).isoformat()
+    return ts.replace("+00:00", "Z")
 
 async def get_runner():
     """Initialize the ADK runner"""
@@ -71,137 +93,8 @@ async def get_runner():
         )
     return runner
 
-async def analyze_with_agent(conversation: str, user_id: str) -> EventDetailResponse:
-    """Analyze conversation using Being agent and return EventDetail structure"""
-    
-    try:
-        # Get the runner
-        current_runner = await get_runner()
-        
-        # Create a session for this analysis (not awaited - it's synchronous)
-        session = current_runner.session_service.create_session(
-            app_name=APP_NAME,
-            user_id=user_id,
-        )
-        
-        # Create analysis prompt
-        analysis_prompt = f"""
-        The user sent this message: "{conversation}"
-        
-        Please help them by:
-        1. First, provide a caring, empathetic conversational response to what they shared
-        2. Then use create_event_detail_json("{conversation}", "{user_id}") to generate a diary entry structure
-        3. Use get_emoji_for_sentiment("{conversation}") to determine the appropriate emoji
-        
-        Please be warm, supportive, and genuine in your response. Show that you understand and care about what they shared.
-        """
-        
-        # Send message to agent
-        response = await current_runner.send_message(
-            session=session,
-            message=analysis_prompt,
-        )
-        
-        # Parse agent response
-        agent_text = response.text if hasattr(response, 'text') else str(response)
-        
-        # Extract structured data or create fallback response
-        title = extract_title_from_response(agent_text, conversation)
-        description = extract_description_from_response(agent_text, conversation)
-        emoji_path = determine_emoji_from_sentiment(conversation)
-        
-        return EventDetailResponse(
-            title=title,
-            description=description,
-            emoji_path=emoji_path,
-            timestamp=datetime.utcnow().isoformat() + "Z",
-            agent_response=agent_text
-        )
-        
-    except Exception as e:
-        print(f"Error in analyze_with_agent: {str(e)}")
-        # Use fallback functions directly when agent fails
-        title = extract_title_from_response("", conversation)
-        description = extract_description_from_response("", conversation)
-        emoji_path = determine_emoji_from_sentiment(conversation)
-        
-        return EventDetailResponse(
-            title=title,
-            description=description,
-            emoji_path=emoji_path,
-            timestamp=datetime.utcnow().isoformat() + "Z",
-            agent_response=f"I understand you're sharing something important with me. Thank you for trusting me with your thoughts about: {conversation[:100]}..."
-        )
-
-def extract_title_from_response(response_text: str, conversation: str) -> str:
-    """Extract or generate a title from the agent response"""
-    response_lower = response_text.lower()
-    conversation_lower = conversation.lower()
-    
-    # Check for common emotional keywords to generate appropriate titles
-    if any(word in conversation_lower for word in ['happy', 'joy', 'excited', 'great', 'awesome']):
-        return "Happy Day"
-    elif any(word in conversation_lower for word in ['study', 'learn', 'class', 'homework', 'exam']):
-        return "Study Day"
-    elif any(word in conversation_lower for word in ['sad', 'upset', 'disappointed', 'frustrated']):
-        return "Tough Day"
-    elif any(word in conversation_lower for word in ['work', 'meeting', 'project', 'deadline']):
-        return "Work Day"
-    elif any(word in conversation_lower for word in ['tired', 'exhausted', 'busy', 'stressed']):
-        return "Busy Day"
-    else:
-        return "Daily Reflection"
-
-def extract_description_from_response(response_text: str, conversation: str) -> str:
-    """Extract or generate a description from the agent response"""
-    # Try to extract a first-person summary from the agent response
-    lines = response_text.split('\n')
-    
-    # Look for lines that seem like diary entries (first person)
-    for line in lines:
-        line = line.strip()
-        if line and (line.startswith('I ') or line.startswith('Today I ') or 'I felt' in line):
-            return line
-    
-    # Fallback: create a simple summary
-    if len(conversation) > 200:
-        return f"I had a conversation today. {conversation[:150]}..."
-    else:
-        return f"I reflected on my day and shared my thoughts about: {conversation[:100]}"
-
-def determine_emoji_from_sentiment(conversation: str) -> str:
-    """Determine emoji path based on conversation sentiment"""
-    conversation_lower = conversation.lower()
-    
-    # Expanded sentiment analysis with more words
-    positive_words = [
-        'happy', 'joy', 'excited', 'great', 'awesome', 'wonderful', 'amazing', 'love', 'good',
-        'fantastic', 'excellent', 'perfect', 'brilliant', 'fun', 'enjoyable', 'pleasant',
-        'delighted', 'thrilled', 'cheerful', 'optimistic', 'confident', 'successful',
-        'accomplished', 'proud', 'satisfied', 'content', 'peaceful', 'relaxed'
-    ]
-    
-    negative_words = [
-        'sad', 'upset', 'angry', 'frustrated', 'terrible', 'awful', 'hate', 'bad', 'worried', 'anxious',
-        'depressed', 'disappointed', 'stressed', 'overwhelmed', 'hopeless', 'miserable',
-        'devastated', 'heartbroken', 'lonely', 'scared', 'fearful', 'nervous', 'irritated',
-        'annoyed', 'embarrassed', 'ashamed', 'guilty', 'regret', 'difficult', 'tough', 'hard'
-    ]
-    
-    # Count positive and negative words
-    positive_count = sum(1 for word in positive_words if word in conversation_lower)
-    negative_count = sum(1 for word in negative_words if word in conversation_lower)
-    
-    print(f"Sentiment analysis: positive_count={positive_count}, negative_count={negative_count}")
-    print(f"Conversation: {conversation_lower}")
-    
-    # More sensitive detection - even 1 word can determine mood
-    if positive_count > negative_count and positive_count > 0:
-        return "assets/images/goodmood.png"
-    elif negative_count > positive_count and negative_count > 0:
-        return "assets/images/badmood.png"
-    else:
-        return "assets/images/moderatemode.png"
+## Data models
+# (Already defined above)
 
 # API Endpoints
 
@@ -218,11 +111,7 @@ async def root():
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint for Flutter service testing"""
-    return HealthResponse(
-        status="healthy",
-        service="Being Agent Service",
-        timestamp=datetime.utcnow().isoformat()
-    )
+    return HealthResponse(status="healthy", service=APP_NAME, timestamp=now_utc_z())
 
 @app.post("/chat", response_model=dict)
 async def chat_with_agent(request: ConversationRequest):
@@ -237,96 +126,64 @@ async def chat_with_agent(request: ConversationRequest):
         # Get the runner
         current_runner = await get_runner()
         
-        # Create a session for this chat (not awaited - it's synchronous)
+        # Create a session for this chat (sync in current ADK version)
         session = current_runner.session_service.create_session(
             app_name=APP_NAME,
             user_id=request.user_id,
         )
-        
-        # Create conversational prompt
-        chat_prompt = f"""
-        The user just shared: "{request.conversation}"
-        
-        Please respond to them with warmth, empathy, and understanding. 
-        Show that you care about what they're going through and provide a supportive response.
-        Don't use any tools for this - just provide a genuine, caring conversational response.
-        """
-        
-        # Send message to agent
-        response = await current_runner.send_message(
+
+        # Configure text-only modality using enum if available
+        if _HAS_ENUM and hasattr(ResponseModality, "TEXT"):
+            run_config = RunConfig(response_modalities=[ResponseModality.TEXT])
+        else:
+            run_config = RunConfig(response_modalities=["TEXT"])  # fallback
+
+        # Create live queue and start live run
+        live_request_queue = LiveRequestQueue()
+        live_events = current_runner.run_live(
             session=session,
-            message=chat_prompt,
+            live_request_queue=live_request_queue,
+            run_config=run_config,
         )
-        
-        # Get the conversational response
-        agent_text = response.text if hasattr(response, 'text') else str(response)
-        
+
+        # Send user message
+        from google.genai.types import Content, Part
+        content = Content(role="user", parts=[Part.from_text(text=request.conversation)])
+        live_request_queue.send_content(content=content)
+
+        # Collect streamed text until turn completes
+        latest_text = ""
+        try:
+            async for event in live_events:
+                # Capture any text content (ADK partials are often cumulative)
+                evt_content = getattr(event, "content", None)
+                parts = getattr(evt_content, "parts", None) if evt_content else None
+                if parts and len(parts) > 0:
+                    p0 = parts[0]
+                    txt = getattr(p0, "text", None)
+                    if isinstance(txt, str) and txt:
+                        latest_text = txt
+                # Stop on turn completion or interruption
+                if getattr(event, "turn_complete", False) or getattr(event, "interrupted", False):
+                    break
+        finally:
+            live_request_queue.close()
+
+        agent_text = latest_text.strip()
+
         return {
             "response": agent_text,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": now_utc_z()
         }
         
     except Exception as e:
         print(f"Error in chat_with_agent: {str(e)}")
-        # Provide contextual fallback response based on conversation content
-        conversation_lower = request.conversation.lower()
-        
-        if any(word in conversation_lower for word in ['happy', 'great', 'wonderful', 'amazing', 'excited']):
-            fallback_response = f"That's wonderful to hear! It sounds like you're having a really positive experience. I'm so happy for you and I'd love to hear more about what made your day so special."
-        elif any(word in conversation_lower for word in ['sad', 'upset', 'difficult', 'tough', 'stressed', 'worried']):
-            fallback_response = f"I can hear that you're going through something challenging right now. It takes courage to share these feelings, and I want you to know that I'm here to listen and support you. Your feelings are completely valid."
-        elif any(word in conversation_lower for word in ['study', 'exam', 'school', 'work', 'project']):
-            fallback_response = f"It sounds like you're putting in a lot of effort with your responsibilities. That kind of dedication is really admirable. How are you feeling about everything you're working on?"
-        else:
-            fallback_response = f"Thank you for sharing that with me. I can tell this is something that's on your mind, and I appreciate you trusting me with your thoughts. I'm here to listen and support you however I can."
-        
-        return {
-            "response": fallback_response,
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        }
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/analyze_conversation", response_model=EventDetailResponse)
-async def analyze_conversation(request: ConversationRequest):
-    """
-    Analyze conversation and return EventDetail-compatible JSON
-    This endpoint replaces Google Gemini API calls
-    """
-    try:
-        if not request.conversation.strip():
-            raise HTTPException(status_code=400, detail="No conversation text provided")
-        
-        # Analyze using Being agent
-        result = await analyze_with_agent(request.conversation, request.user_id)
-        return result
-        
-    except Exception as e:
-        print(f"Error in analyze_conversation: {str(e)}")
-        # Return fallback response
-        return EventDetailResponse(
-            title="Daily Reflection",
-            description="Unable to analyze conversation at this time. Please try again later.",
-            emoji_path="assets/images/moderatemode.png",
-            timestamp=datetime.utcnow().isoformat() + "Z",
-            agent_response=f"Error: {str(e)}"
-        )
+# No analyze/test endpoints in this simplified server – root agent only
 
-@app.get("/test/{user_id}")
-async def test_agent(user_id: str):
-    """Test endpoint to verify agent functionality"""
-    test_conversation = "I had a great day today! Everything went well and I'm feeling happy."
-    
-    try:
-        result = await analyze_with_agent(test_conversation, user_id)
-        return {
-            "test_status": "success",
-            "test_conversation": test_conversation,
-            "result": result
-        }
-    except Exception as e:
-        return {
-            "test_status": "failed",
-            "error": str(e)
-        }
+# Removed /analyze_conversation and /test for now (root agent only per request)
 
 # Startup event
 @app.on_event("startup")

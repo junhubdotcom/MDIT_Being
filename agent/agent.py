@@ -1,13 +1,13 @@
 import datetime
 from google.adk.agents import Agent
 
-# Import tools from sub-agents rather than the agents themselves
-from .subagent.journal_agent import summarize_text, save_diary, create_event_detail_json
-from .subagent.mood_agent import analyze_sentiment, append_mood_point, get_emoji_for_sentiment
+# Import tools from sub-agents rather than the agents themselves (package-relative)
+from subagent.journal_agent import summarize_text, save_diary, create_event_detail_json
+from subagent.mood_agent import analyze_sentiment, append_mood_point, get_emoji_for_sentiment
 
 root_agent = Agent(
     name="being_buddy_agent", 
-    model="gemini-2.0-flash",  # Using Google Gemini model
+    model="gemini-2.0-flash-exp",  # Using Google Gemini model
     description=("Root conversational agent: main coordinator for chat, journaling, and mood analysis."),
     instruction=(
         "You are Being Buddy — an empathetic, non-judgmental companion who coordinates all interactions. "
