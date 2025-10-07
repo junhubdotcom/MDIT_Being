@@ -71,7 +71,9 @@ def save_diary(user_id: str, summary: str) -> dict:
     return {"entry_id": entry_id, "summary": summary, "timestamp": ts}
 
 
-def create_event_detail_json(conversation: str, user_id: str) -> dict:
+from typing import Optional, Dict, Any
+
+def create_event_detail_json(conversation: str, user_id: str, mood: Optional[Dict[str, Any]] = None) -> dict:
     """
     Create a complete EventDetail-compatible JSON structure.
     
@@ -90,36 +92,51 @@ def create_event_detail_json(conversation: str, user_id: str) -> dict:
     
     # Create current timestamp
     now = datetime.datetime.now()
-    
-    return {
+
+    # Merge mood data if provided
+    emoji_path = None
+    sentiment_score = None
+    mood_label = None
+    if isinstance(mood, dict):
+        emoji_path = mood.get("emoji_path")
+        sentiment_score = mood.get("score")
+        mood_label = mood.get("mood_label")
+
+    event = {
         "date": now.isoformat(),
         "title": summary_result["title"],
         "time": now.strftime("%I:%M %p"),
         "description": summary_result["description"],
         "entry_id": diary_result["entry_id"],
-        "timestamp": diary_result["timestamp"]
-        # Note: emoji will be determined by mood_agent
+        "timestamp": diary_result["timestamp"],
     }
+
+    if emoji_path is not None:
+        event["emoji_path"] = emoji_path
+    if sentiment_score is not None:
+        event["sentiment_score"] = sentiment_score
+    if mood_label is not None:
+        event["mood_label"] = mood_label
+
+    return event
 
 
 journal_agent = Agent(
     name="journal_agent",
-    model="gemini-2.0-flash",
-    description=("Summarizes conversation into diary entries and creates EventDetail JSON for the buddy agent."),
+    model="gemini-2.0-flash-exp",
+    description=("Service agent that summarizes the conversation and produces EventDetail JSON, consuming mood analysis when available."),
     instruction=(
-        "You are JournalAgent - a service for the Being Buddy agent. "
-        "When called by the buddy agent with conversation content: "
-        "1) Use summarize_text() to create structured diary content with title and description "
-        "2) Use save_diary(user_id, summary) to persist the entry "
-        "3) Use create_event_detail_json() for complete EventDetail structure "
-        "4) Return structured response suitable for Flutter EventDetail model "
-        "5) Do NOT chat with the user directly - you serve the buddy agent only "
-        "6) Always provide clear, concise summaries suitable for diary entries "
-        "7) Titles should be 3 words max (e.g., 'Happy Day', 'Study Day', 'Work Day') "
-        "8) Descriptions should be first-person diary entries "
-        
-        "Format your response as: "
-        "Diary analysis complete! Title: '[title]', Entry ID: [entry_id], Time: [timestamp]"
+        "ROLE: You are JournalAgent, not a chat bot. You only serve buddy_agent.\n"
+        "TASKS:\n"
+        "- Use summarize_text(conversation) to produce title, description, summary.\n"
+        "- Use save_diary(user_id, summary) to persist the entry.\n"
+        "- If mood analysis is needed, request help from mood_agent (or accept a provided mood JSON).\n"
+        "- Use create_event_detail_json(conversation, user_id, mood?) to build final EventDetail.\n"
+        "OUTPUT:\n"
+        "- Always return STRICT JSON only, no prose.\n"
+        "- EventDetail schema: {date, title, time, description, entry_id, timestamp, emoji_path?, sentiment_score?, mood_label?}.\n"
+        "CONSTRAINTS:\n"
+        "- Titles must be 3 words max. Description must be first-person diary style. No extra commentary. JSON only.\n"
     ),
     tools=[summarize_text, save_diary, create_event_detail_json],
 )

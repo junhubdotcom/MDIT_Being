@@ -35,6 +35,8 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ""):
     __package__ = "agent"
 
 from . import root_agent
+from subagent.mood_agent import analyze_sentiment, get_emoji_for_sentiment
+from subagent.journal_agent import summarize_text, save_diary, create_event_detail_json
 
 # Load environment variables
 load_dotenv()
@@ -68,6 +70,15 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     timestamp: str
+
+class MoodAnalyzeRequest(BaseModel):
+    text: str
+    user_id: str | None = None
+    date_iso: str | None = None
+
+class JournalCreateRequest(BaseModel):
+    conversation: str
+    user_id: str
 
 # Global runner instance
 runner = None
@@ -178,6 +189,59 @@ async def chat_with_agent(request: ConversationRequest):
         
     except Exception as e:
         print(f"Error in chat_with_agent: {str(e)}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/mood/analyze", response_model=dict)
+async def mood_analyze_endpoint(req: MoodAnalyzeRequest):
+    """Deterministic mood analysis using local tools (no LLM)."""
+    try:
+        text = (req.text or "").strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="text is required")
+        mood = analyze_sentiment(text)
+        # Enrich with label from helper for consistency
+        emoji_info = get_emoji_for_sentiment(text)
+        mood_label = emoji_info.get("mood_label")
+        if mood_label is not None:
+            mood["mood_label"] = mood_label
+        mood["timestamp"] = now_utc_z()
+        return mood
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in /mood/analyze: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/journal/create", response_model=dict)
+async def journal_create_endpoint(req: JournalCreateRequest):
+    """Create EventDetail JSON by summarizing conversation and injecting mood analysis."""
+    try:
+        conversation = (req.conversation or "").strip()
+        user_id = (req.user_id or "").strip()
+        if not conversation:
+            raise HTTPException(status_code=400, detail="conversation is required")
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+
+        # Deterministic mood analysis
+        mood = analyze_sentiment(conversation)
+        emoji_info = get_emoji_for_sentiment(conversation)
+        mood_label = emoji_info.get("mood_label")
+        if mood_label is not None:
+            mood["mood_label"] = mood_label
+
+        # Persist diary entry and build final EventDetail JSON
+        # Note: create_event_detail_json handles saving internally as well
+        event_detail = create_event_detail_json(conversation, user_id, mood=mood)
+        return event_detail
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in /journal/create: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
