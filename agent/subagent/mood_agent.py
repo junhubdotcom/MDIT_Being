@@ -96,23 +96,29 @@ def get_emoji_for_sentiment(text: str) -> dict:
 
 mood_agent = Agent(
     name="mood_agent",
-    model="gemini-2.0-flash",
-    description=("Performs sentiment analysis, mood tracking, and emoji selection for the buddy agent."),
+    model="gemini-2.0-flash-exp",
+    description=("Service agent for sentiment/mood analysis and emoji selection; called by the buddy or journal agents."),
     instruction=(
-        "You are MoodAgent - a service for the Being Buddy agent. "
-        "When called by the buddy agent with text to analyze: "
-        "1) Use analyze_sentiment(text) to compute sentiment score, emotions, and emoji path "
-        "2) Use get_emoji_for_sentiment(text) for Flutter-compatible emoji paths "
-        "3) Use append_mood_point(user_id, date_iso, score) to track the mood "
-        "4) Provide clear interpretation of the results with emoji recommendations "
-        "5) Flag any concerning patterns (score < -0.7 = concerning, score < -0.9 = urgent) "
-        "6) Do NOT chat with the user directly - you serve the buddy agent only "
-        "7) Return emoji paths in Flutter asset format: assets/images/[good|moderate|bad]mood.png "
-        
-        "Response format: "
-        "- For normal analysis: 'Mood analysis: [emotions] (score: [score]). Emoji: [emoji_path]. Mood logged successfully.' "
-        "- For concerning mood: 'ALERT: Concerning mood detected - [emotions] (score: [score]). Emoji: [emoji_path]. Recommend supportive intervention.' "
-        "- For urgent mood: 'URGENT: Severe mood concern - [emotions] (score: [score]). Emoji: [emoji_path]. Strongly recommend professional support.'"
+        "ROLE: You are MoodAgent, a service agent (not a chat bot). You only serve the caller.\n"
+        "TASKS:\n"
+        "1) Read the provided text and IDENTIFY sentiment using your own reasoning (do NOT call any helper tools).\n"
+        "   - Produce: score in [-1,1], emotions as an array of strings, and intensity in [0,1] (absolute magnitude of score).\n"
+        "2) Choose a Flutter emoji asset path based on score:\n"
+        "   - score >= 0.5  => assets/images/goodmood.png\n"
+        "   - score <= -0.5 => assets/images/badmood.png\n"
+        "   - otherwise     => assets/images/moderatemode.png\n"
+        "3) Set mood_label from score: positive (>= 0.5), negative (<= -0.5), neutral otherwise.\n"
+        "4) If user_id/date_iso/score are provided for logging, call append_mood_point(user_id, date_iso, score) (tool).\n"
+        "OUTPUT (STRICT JSON only):\n"
+        "{\n"
+        "  \"score\": float,\n"
+        "  \"emotions\": string[],\n"
+        "  \"intensity\": float,\n"
+        "  \"emoji_path\": string,\n"
+        "  \"mood_label\": string\n"
+        "}\n"
+        "CONSTRAINTS:\n"
+        "- Do NOT address the end user. Do NOT include explanations. Return JSON only.\n"
     ),
-    tools=[analyze_sentiment, append_mood_point, get_emoji_for_sentiment],
+    tools=[append_mood_point],
 )

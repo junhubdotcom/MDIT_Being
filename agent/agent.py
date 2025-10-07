@@ -1,37 +1,35 @@
-import datetime
 from google.adk.agents import Agent
-
-# Import tools from sub-agents rather than the agents themselves (package-relative)
-from subagent.journal_agent import summarize_text, save_diary, create_event_detail_json
-from subagent.mood_agent import analyze_sentiment, append_mood_point, get_emoji_for_sentiment
+from subagent.journal_agent import journal_agent
+from subagent.mood_agent import mood_agent
 
 root_agent = Agent(
-    name="being_buddy_agent", 
-    model="gemini-2.0-flash-exp",  # Using Google Gemini model
+    name="being_buddy_agent",
+    model="gemini-2.0-flash-exp",
     description=("Root conversational agent: main coordinator for chat, journaling, and mood analysis."),
     instruction=(
         "You are Being Buddy — an empathetic, non-judgmental companion who coordinates all interactions. "
-        "You ALWAYS stay as the main agent and respond directly to the user. You use tools to handle specific tasks but remain in control. "
+        "You ALWAYS speak to the user and remain in control. Do not call tools.\n"
+        "WORKFLOW:\n"
+        "1) Primary chat: validate feelings and reflect.\n"
+        "2) Diary and mood use-cases are currently handled by dedicated HTTP endpoints, not by tool calls.\n"
+        "3) Safety: Never provide medical diagnosis. If severe mood is detected, offer supportive words and suggest professional help.\n"
+        "OUTPUT:\n"
+        "- For normal chat: respond empathetically in text.\n"
+        "- Do not emit JSON unless explicitly asked by the user.\n"
         
-        "WORKFLOW: "
-        "1) **Primary Role**: Chat with the user with validation, empathy, and reflection. "
-        "2) **Diary Requests**: When user wants to save/journal/log the conversation: "
-        "   - Use summarize_text() to create a summary of the conversation "
-        "   - Use save_diary(user_id, summary) to persist the diary entry "
-        "   - Use analyze_sentiment(summary) to analyze the mood of the diary "
-        "   - Use append_mood_point(user_id, date_iso, score) to track mood "
-        "   - Then YOU respond to the user with confirmation and mood insight "
-        "3) **Pessimistic Content**: When user expresses negative emotions (sad, anxious, etc.): "
-        "   - Use analyze_sentiment(text) to analyze the sentiment "
-        "   - Use append_mood_point(user_id, date_iso, score) to track mood "
-        "   - If the analysis shows concerning levels (score < -0.7), YOU suggest precautionary actions "
-        "   - Continue the conversation with supportive guidance "
-        "4) **Response Pattern**: Always respond to the user directly after using tools. "
-        "5) **Safety**: Never provide medical diagnosis. If mood analysis indicates severe risk, offer supportive words and recommend professional help. "
-        
-        "Available tools: summarize_text, save_diary, create_event_detail_json, analyze_sentiment, append_mood_point, get_emoji_for_sentiment"
-        "Remember: You coordinate everything and handle all user communication directly."
     ),
-    tools=[summarize_text, save_diary, create_event_detail_json, analyze_sentiment, append_mood_point, get_emoji_for_sentiment],
-    sub_agents=[],  # No sub-agents, just tools
+    tools=[],
+    sub_agents=[journal_agent, mood_agent],
 )
+
+#"You are Being Buddy — an empathetic, non-judgmental companion who coordinates all interactions. "
+#"You ALWAYS speak to the user and remain in control. Delegate specialized tasks to subagents.\n"
+#"WORKFLOW:\n"
+#"1) Primary chat: validate feelings and reflect.\n"
+#"2) Diary Requests: delegate to journal_agent (do not call raw tools). Provide user_id and conversation; expect EventDetail JSON back.\n"
+#"3) Mood Checks or pessimistic content: delegate to mood_agent with relevant text; optionally log mood with append_mood_point.\n"
+#"4) Safety: Never provide medical diagnosis. If severe mood is detected, offer supportive words and suggest professional help.\n"
+#"OUTPUT:\n"
+#"- For normal chat: respond empathetically in text.\n"
+#"- For diary use case: return the EventDetail JSON exactly as provided by journal_agent.\n"
+#"- For mood use case: return the MoodAnalysis JSON exactly as provided by mood_agent.\n"

@@ -36,6 +36,33 @@ class _NewcalendarState extends State<Newcalendar> {
     analyzeMessagesAndCreateEvent(context);
   }
 
+  // Build a day cell with an emoji overlay if present for that date
+  Widget _buildEmojiDayCell(DateTime day) {
+    EventDetail? dayData = _getSelectedDayData(day);
+    final emojiPath = dayData?.emoji;
+
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        image: emojiPath != null
+            ? DecorationImage(
+                image: AssetImage(emojiPath),
+                fit: BoxFit.cover,
+              )
+            : null,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        day.day.toString(),
+        style: TextStyle(
+          fontSize: 16,
+          color: emojiPath != null ? Colors.transparent : Colors.black,
+          fontWeight: emojiPath != null ? FontWeight.w700 : FontWeight.w400,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Get event details for the selected day
@@ -91,31 +118,9 @@ class _NewcalendarState extends State<Newcalendar> {
                       outsideDaysVisible: false,
                     ),
                     calendarBuilders: CalendarBuilders(
-                      defaultBuilder: (context, day, focusedDay) {
-                        EventDetail? dayData = _getSelectedDayData(day);
-                        final emojiPath = dayData?.emoji;
-              
-                        return Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            image: emojiPath != null
-                                ? DecorationImage(
-                                    image: AssetImage(emojiPath),
-                                    fit: BoxFit.cover,
-                                  )
-                                : null,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            day.day.toString(),
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: emojiPath != null ? Colors.transparent : Colors.black,
-                              fontWeight: emojiPath != null ? FontWeight.w700 : FontWeight.w400,
-                            ),
-                          ),
-                        );
-                      },
+                      defaultBuilder: (context, day, focusedDay) => _buildEmojiDayCell(day),
+                      selectedBuilder: (context, day, focusedDay) => _buildEmojiDayCell(day),
+                      todayBuilder: (context, day, focusedDay) => _buildEmojiDayCell(day),
                     ),
                   ),
               
