@@ -42,6 +42,7 @@
 // - A sliding up panel with tabs for selecting furniture, room designs, and treats.
 
 import 'dart:io';
+import 'dart:async';
 import 'dart:math';
 import 'dart:convert';
 
@@ -58,6 +59,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 import 'package:provider/provider.dart';
 import 'package:hackathon_x_project/backend/message_provider.dart';
+import 'package:hackathon_x_project/backend/event_model.dart';
+import 'package:hackathon_x_project/backend/conversation_buffer.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -88,6 +91,65 @@ class _HomeState extends State<Home>
   GenerativeModel? _model;
   late final String _backendBaseUrl;
   late final String _userId;
+  final ConversationBuffer _convBuffer = ConversationBuffer();
+
+  bool _shouldCreateJournal(String text) {
+    final regex = RegExp(r"\b(save|journal|record|create)\b", caseSensitive: false);
+    return regex.hasMatch(text);
+  }
+
+  Future<void> _createJournal(String transcript, {XFile? pickedImage}) async {
+    final uri = Uri.parse('$_backendBaseUrl/journal/create');
+    final payload = {
+      'user_id': _userId,
+      'conversation': transcript,
+    };
+    final res = await http.post(
+      uri,
+      headers: { 'Content-Type': 'application/json' },
+      body: jsonEncode(payload),
+    );
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      // Map backend JSON to EventDetail model
+      final dateStr = (data['date'] as String?) ?? '';
+      final title = (data['title'] as String?) ?? 'Journal Entry';
+      final time = (data['time'] as String?) ?? '';
+      final description = (data['description'] as String?) ?? '';
+      final emojiPath = data['emoji_path'] as String?; // map to emoji field
+      DateTime parsedDate;
+      try {
+        parsedDate = DateTime.parse(dateStr).toLocal();
+      } catch (_) {
+        parsedDate = DateTime.now();
+      }
+      final ev = EventDetail(
+        date: parsedDate,
+        title: title,
+        time: time,
+        description: description,
+        emoji: emojiPath,
+        imageFile: pickedImage,
+      );
+      addEventDetail(ev);
+      // Log a compact preview and show a chat confirmation
+      final preview = {
+        'title': title,
+        'time': time,
+        'date': parsedDate.toIso8601String(),
+        'emoji': emojiPath,
+      };
+      debugPrint('addEventDetail => ' + jsonEncode(preview));
+      final snippet = description.length > 120 ? description.substring(0, 120) + '...' : description;
+      _addMessage(Message(
+        text: 'Journal saved: ' + title + '\n' + time + ' • ' + parsedDate.toIso8601String() + '\n' + snippet,
+        isUser: false,
+      ));
+    } else {
+      // Surface a lightweight error in chat thread for visibility
+      _addMessage(Message(text: 'Journal error ${res.statusCode}: ${res.body}', isUser: false));
+    }
+  }
 
   Future<String> _sendToAgent(String text) async {
     final uri = Uri.parse('$_backendBaseUrl/chat');
@@ -118,17 +180,41 @@ class _HomeState extends State<Home>
       if (image == null) {
         if (_controller.text.isEmpty) return;
         final prompt = _controller.text.trim();
+        // Track user text for journaling
+        _convBuffer.addUser(prompt);
+        final shouldJournal = _shouldCreateJournal(prompt);
         _addMessage(Message(text: prompt, isUser: true));
         setState(() { _isLoading = true; });
+        // Build transcript only when needed
+        Future<void>? journalFuture;
+        if (shouldJournal) {
+          final transcript = _convBuffer.toJournalText(maxMessages: 50, maxChars: 8000);
+          journalFuture = _createJournal(transcript);
+        }
+        // Always call chat
         final agentReply = await _sendToAgent(prompt);
         setState(() {
           _addMessage(Message(text: agentReply, isUser: false));
           _isLoading = false;
         });
+        // Let journal complete in background
+        if (journalFuture != null) {
+          unawaited(journalFuture);
+        }
       } else {
         if (_controller.text.isNotEmpty) {
           _addMessage(
               Message(text: _controller.text, isUser: true, image: image));
+          // Track user text for journaling (image+prompt path)
+          _convBuffer.addUser(_controller.text.trim());
+          // Optional: trigger journal here too based on keywords
+          final prompt = _controller.text.trim();
+          final shouldJournal = _shouldCreateJournal(prompt);
+          if (shouldJournal) {
+            final transcript = _convBuffer.toJournalText(maxMessages: 50, maxChars: 8000);
+            // Fire-and-forget journal creation with attached local image
+            unawaited(_createJournal(transcript, pickedImage: image));
+          }
           setState(() {
             _isLoading = false;
           });
