@@ -1,4 +1,6 @@
 from google.adk.agents import Agent
+from subagent.journal_agent import journal_agent
+from subagent.mood_agent import mood_agent
 
 root_agent = Agent(
     name="being_buddy_agent",
@@ -17,7 +19,7 @@ root_agent = Agent(
         
     ),
     tools=[],
-    sub_agents=[],
+    sub_agents=[journal_agent, mood_agent],
 )
 
 #"You are Being Buddy — an empathetic, non-judgmental companion who coordinates all interactions. "

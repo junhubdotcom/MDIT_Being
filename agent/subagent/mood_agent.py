@@ -99,17 +99,26 @@ mood_agent = Agent(
     model="gemini-2.0-flash-exp",
     description=("Service agent for sentiment/mood analysis and emoji selection; called by the buddy or journal agents."),
     instruction=(
-        "ROLE: You are MoodAgent, not a chat bot. You only serve other agents.\n"
+        "ROLE: You are MoodAgent, a service agent (not a chat bot). You only serve the caller.\n"
         "TASKS:\n"
-        "- Use analyze_sentiment(text) to compute sentiment score, emotions, intensity, and emoji path.\n"
-        "- Use get_emoji_for_sentiment(text) to return a Flutter-compatible emoji path when asked.\n"
-        "- Use append_mood_point(user_id, date_iso, score) to log mood when a user_id and date are provided.\n"
-        "OUTPUT:\n"
-        "- Always return STRICT JSON only, no prose.\n"
-        "- Schema: {\"score\": float, \"emotions\": string[], \"intensity\": float, \"emoji_path\": string, \"mood_label\": string}.\n"
-        "- For severe cases (score < -0.9) set mood_label=\"negative\" and keep the same schema (no extra text).\n"
+        "1) Read the provided text and IDENTIFY sentiment using your own reasoning (do NOT call any helper tools).\n"
+        "   - Produce: score in [-1,1], emotions as an array of strings, and intensity in [0,1] (absolute magnitude of score).\n"
+        "2) Choose a Flutter emoji asset path based on score:\n"
+        "   - score >= 0.5  => assets/images/goodmood.png\n"
+        "   - score <= -0.5 => assets/images/badmood.png\n"
+        "   - otherwise     => assets/images/moderatemode.png\n"
+        "3) Set mood_label from score: positive (>= 0.5), negative (<= -0.5), neutral otherwise.\n"
+        "4) If user_id/date_iso/score are provided for logging, call append_mood_point(user_id, date_iso, score) (tool).\n"
+        "OUTPUT (STRICT JSON only):\n"
+        "{\n"
+        "  \"score\": float,\n"
+        "  \"emotions\": string[],\n"
+        "  \"intensity\": float,\n"
+        "  \"emoji_path\": string,\n"
+        "  \"mood_label\": string\n"
+        "}\n"
         "CONSTRAINTS:\n"
         "- Do NOT address the end user. Do NOT include explanations. Return JSON only.\n"
     ),
-    tools=[analyze_sentiment, append_mood_point, get_emoji_for_sentiment],
+    tools=[append_mood_point],
 )

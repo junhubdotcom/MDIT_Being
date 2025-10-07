@@ -35,8 +35,8 @@ if __name__ == "__main__" and (__package__ is None or __package__ == ""):
     __package__ = "agent"
 
 from . import root_agent
-from subagent.mood_agent import analyze_sentiment, get_emoji_for_sentiment
-from subagent.journal_agent import summarize_text, save_diary, create_event_detail_json
+from subagent.mood_agent import mood_agent
+from subagent.journal_agent import journal_agent
 
 # Load environment variables
 load_dotenv()
@@ -82,6 +82,8 @@ class JournalCreateRequest(BaseModel):
 
 # Global runner instance
 runner = None
+journal_runner = None
+mood_runner = None
 
 def now_utc_z() -> str:
     # Use timezone-aware UTC datetime and format with trailing Z
@@ -103,6 +105,77 @@ async def get_runner():
             agent=root_agent,
         )
     return runner
+
+async def get_journal_runner():
+    """Initialize the ADK runner for the journal_agent"""
+    global journal_runner
+    if journal_runner is None:
+        journal_runner = InMemoryRunner(
+            app_name=f"{APP_NAME} - Journal",
+            agent=journal_agent,
+        )
+    return journal_runner
+
+async def get_mood_runner():
+    """Initialize the ADK runner for the mood_agent"""
+    global mood_runner
+    if mood_runner is None:
+        mood_runner = InMemoryRunner(
+            app_name=f"{APP_NAME} - Mood",
+            agent=mood_agent,
+        )
+    return mood_runner
+
+def _try_parse_json_object(text: str):
+    """Best-effort to parse a JSON object from model output.
+    - Accepts direct JSON
+    - Strips ``` fences and optional language tags
+    - Extracts the first balanced {...} object if extra prose is present
+    Returns dict on success, else None.
+    """
+    if not text:
+        return None
+    s = text.strip()
+    # 1) Direct parse
+    try:
+        obj = json.loads(s)
+        return obj if isinstance(obj, dict) else None
+    except Exception:
+        pass
+    # 2) Strip code fences
+    if s.startswith("```"):
+        # remove opening fence line and closing fence
+        lines = s.splitlines()
+        if len(lines) >= 2 and lines[0].startswith("```"):
+            # drop first line and any trailing closing fence line
+            if lines[-1].strip() == "```":
+                inner = "\n".join(lines[1:-1]).strip()
+            else:
+                inner = "\n".join(lines[1:]).strip()
+            try:
+                obj = json.loads(inner)
+                return obj if isinstance(obj, dict) else None
+            except Exception:
+                s = inner  # continue trying on inner
+    # 3) Extract first balanced JSON object
+    start = s.find('{')
+    if start == -1:
+        return None
+    depth = 0
+    for i in range(start, len(s)):
+        ch = s[i]
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                candidate = s[start:i+1]
+                try:
+                    obj = json.loads(candidate)
+                    return obj if isinstance(obj, dict) else None
+                except Exception:
+                    return None
+    return None
 
 ## Data models
 # (Already defined above)
@@ -195,17 +268,74 @@ async def chat_with_agent(request: ConversationRequest):
 
 @app.post("/mood/analyze", response_model=dict)
 async def mood_analyze_endpoint(req: MoodAnalyzeRequest):
-    """Deterministic mood analysis using local tools (no LLM)."""
+    """Agent-driven mood analysis using mood_agent via ADK."""
     try:
         text = (req.text or "").strip()
         if not text:
             raise HTTPException(status_code=400, detail="text is required")
-        mood = analyze_sentiment(text)
-        # Enrich with label from helper for consistency
-        emoji_info = get_emoji_for_sentiment(text)
-        mood_label = emoji_info.get("mood_label")
-        if mood_label is not None:
-            mood["mood_label"] = mood_label
+
+        current_runner = await get_mood_runner()
+        # Prefer JSON modality when available
+        if _HAS_ENUM and hasattr(ResponseModality, "JSON"):
+            run_config = RunConfig(response_modalities=[ResponseModality.JSON])
+        elif _HAS_ENUM and hasattr(ResponseModality, "TEXT"):
+            run_config = RunConfig(response_modalities=[ResponseModality.TEXT])
+        else:
+            run_config = RunConfig(response_modalities=["TEXT"])  # fallback
+
+        live_request_queue = LiveRequestQueue()
+        session = current_runner.session_service.create_session(
+            app_name=f"{APP_NAME} - Mood",
+            user_id=req.user_id or "anonymous",
+        )
+        live_events = current_runner.run_live(
+            session=session,
+            live_request_queue=live_request_queue,
+            run_config=run_config,
+        )
+
+        from google.genai.types import Content, Part
+        instruction = (
+            "You are a service agent. Read the provided text and IDENTIFY sentiment yourself. "
+            "Return ONLY a single JSON object with fields {score, emotions, intensity, emoji_path, mood_label}. "
+            "If user_id and date_iso are provided, you may call append_mood_point(user_id, date_iso, score) to log the mood. "
+            "No code fences or extra text. JSON only."
+        )
+        payload = {
+            "text": text,
+            "user_id": req.user_id,
+            "date_iso": req.date_iso or now_utc_z(),
+        }
+        content = Content(
+            role="user",
+            parts=[
+                Part.from_text(text=instruction),
+                Part.from_text(text=json.dumps(payload)),
+            ],
+        )
+        live_request_queue.send_content(content=content)
+
+        latest_text = ""
+        try:
+            async for event in live_events:
+                evt_content = getattr(event, "content", None)
+                parts = getattr(evt_content, "parts", None) if evt_content else None
+                if parts and len(parts) > 0:
+                    p0 = parts[0]
+                    txt = getattr(p0, "text", None)
+                    if isinstance(txt, str) and txt:
+                        latest_text = txt
+                if getattr(event, "turn_complete", False) or getattr(event, "interrupted", False):
+                    break
+        finally:
+            live_request_queue.close()
+
+        mood = _try_parse_json_object(latest_text)
+        if not isinstance(mood, dict):
+            preview = (latest_text or "").strip()
+            if len(preview) > 160:
+                preview = preview[:160] + "..."
+            raise HTTPException(status_code=502, detail=f"Invalid JSON from mood_agent. Preview: {preview}")
         mood["timestamp"] = now_utc_z()
         return mood
     except HTTPException:
@@ -218,7 +348,7 @@ async def mood_analyze_endpoint(req: MoodAnalyzeRequest):
 
 @app.post("/journal/create", response_model=dict)
 async def journal_create_endpoint(req: JournalCreateRequest):
-    """Create EventDetail JSON by summarizing conversation and injecting mood analysis."""
+    """Create EventDetail JSON using the journal_agent via ADK (agent-driven tool calls)."""
     try:
         conversation = (req.conversation or "").strip()
         user_id = (req.user_id or "").strip()
@@ -227,16 +357,130 @@ async def journal_create_endpoint(req: JournalCreateRequest):
         if not user_id:
             raise HTTPException(status_code=400, detail="user_id is required")
 
-        # Deterministic mood analysis
-        mood = analyze_sentiment(conversation)
-        emoji_info = get_emoji_for_sentiment(conversation)
-        mood_label = emoji_info.get("mood_label")
-        if mood_label is not None:
-            mood["mood_label"] = mood_label
+        # Agent-driven mood analysis using mood_agent
+        mood_runner_local = await get_mood_runner()
+        if _HAS_ENUM and hasattr(ResponseModality, "JSON"):
+            mood_run_config = RunConfig(response_modalities=[ResponseModality.JSON])
+        elif _HAS_ENUM and hasattr(ResponseModality, "TEXT"):
+            mood_run_config = RunConfig(response_modalities=[ResponseModality.TEXT])
+        else:
+            mood_run_config = RunConfig(response_modalities=["TEXT"])  # fallback
+        mood_request_queue = LiveRequestQueue()
+        mood_session = mood_runner_local.session_service.create_session(
+            app_name=f"{APP_NAME} - Mood",
+            user_id=user_id,
+        )
+        mood_events = mood_runner_local.run_live(
+            session=mood_session,
+            live_request_queue=mood_request_queue,
+            run_config=mood_run_config,
+        )
+        from google.genai.types import Content as _Content, Part as _Part
+        mood_instruction = (
+            "You are a service agent. Read the provided text and IDENTIFY sentiment yourself. "
+            "Return ONLY a single JSON object with fields {score, emotions, intensity, emoji_path, mood_label}. "
+            "No code fences or extra text. JSON only."
+        )
+        mood_payload = {"text": conversation}
+        mood_content = _Content(role="user", parts=[
+            _Part.from_text(text=mood_instruction),
+            _Part.from_text(text=json.dumps(mood_payload)),
+        ])
+        mood_request_queue.send_content(content=mood_content)
+        mood_text = ""
+        try:
+            async for ev in mood_events:
+                evc = getattr(ev, "content", None)
+                prts = getattr(evc, "parts", None) if evc else None
+                if prts and len(prts) > 0:
+                    p0 = prts[0]
+                    txt = getattr(p0, "text", None)
+                    if isinstance(txt, str) and txt:
+                        mood_text = txt
+                if getattr(ev, "turn_complete", False) or getattr(ev, "interrupted", False):
+                    break
+        finally:
+            mood_request_queue.close()
+        mood = _try_parse_json_object(mood_text) or {}
 
-        # Persist diary entry and build final EventDetail JSON
-        # Note: create_event_detail_json handles saving internally as well
-        event_detail = create_event_detail_json(conversation, user_id, mood=mood)
+    # Get a dedicated runner for the journal agent
+        current_runner = await get_journal_runner()
+
+        # Prefer JSON modality if available, else text
+        if _HAS_ENUM and hasattr(ResponseModality, "JSON"):
+            run_config = RunConfig(response_modalities=[ResponseModality.JSON])
+        elif _HAS_ENUM and hasattr(ResponseModality, "TEXT"):
+            run_config = RunConfig(response_modalities=[ResponseModality.TEXT])
+        else:
+            run_config = RunConfig(response_modalities=["TEXT"])  # fallback
+
+        # Start a live run to capture the final JSON
+        live_request_queue = LiveRequestQueue()
+        session = current_runner.session_service.create_session(
+            app_name=f"{APP_NAME} - Journal",
+            user_id=user_id,
+        )
+        live_events = current_runner.run_live(
+            session=session,
+            live_request_queue=live_request_queue,
+            run_config=run_config,
+        )
+
+    # Build a precise instruction to the service agent to perform summarization and call save_diary
+        from google.genai.types import Content, Part
+        instruction = (
+            "You are a service agent. Summarize the conversation YOURSELF (no helper tool). "
+            "Create a short 'summary' string, a title (max 3 words), and a first-person diary-style description. "
+            "Then call your tool save_diary(user_id, summary) and use its entry_id and timestamp. "
+            "Build and return ONLY a single JSON object (EventDetail) with fields: {date, title, time, description, entry_id, timestamp, emoji_path?, sentiment_score?, mood_label?}. "
+            "Use the provided now_iso for 'date' and time_str for 'time'. "
+            "If mood is provided, include emoji_path/mood_label/sentiment_score when present. "
+            "No code fences or extra text. JSON only."
+        )
+        # Prepare timestamp inputs for deterministic values in output
+        now_iso = now_utc_z()
+        time_str = datetime.now().strftime("%I:%M %p")
+        # Embed inputs; mood passed as JSON for clarity
+        payload = {
+            "conversation": conversation,
+            "user_id": user_id,
+            "mood": mood,
+            "now_iso": now_iso,
+            "time_str": time_str,
+        }
+        content = Content(
+            role="user",
+            parts=[
+                Part.from_text(text=instruction),
+                Part.from_text(text=json.dumps(payload)),
+            ],
+        )
+        live_request_queue.send_content(content=content)
+
+        # Collect final strict JSON from the agent
+        latest_text = ""
+        try:
+            async for event in live_events:
+                evt_content = getattr(event, "content", None)
+                parts = getattr(evt_content, "parts", None) if evt_content else None
+                if parts and len(parts) > 0:
+                    p0 = parts[0]
+                    txt = getattr(p0, "text", None)
+                    if isinstance(txt, str) and txt:
+                        latest_text = txt
+                if getattr(event, "turn_complete", False) or getattr(event, "interrupted", False):
+                    break
+        finally:
+            live_request_queue.close()
+
+        # Parse the strict JSON response (tolerate minor formatting deviations)
+        event_detail = _try_parse_json_object(latest_text)
+        if not isinstance(event_detail, dict):
+            preview = (latest_text or "").strip()
+            if len(preview) > 160:
+                preview = preview[:160] + "..."
+            raise HTTPException(status_code=502, detail=f"Invalid JSON from journal_agent. Preview: {preview}")
+
         return event_detail
     except HTTPException:
         raise
