@@ -176,15 +176,18 @@ class _HomeState extends State<Home>
 
   callGeminiModel() async {
     try {
+      // Prevent re-entrancy while a request is in-flight
+      if (_isLoading) return;
       //developer.log("callGeminiModel was run");
       if (image == null) {
         if (_controller.text.isEmpty) return;
+        // Immediately mark loading so UI disables send right away
+        setState(() { _isLoading = true; });
         final prompt = _controller.text.trim();
         // Track user text for journaling
         _convBuffer.addUser(prompt);
         final shouldJournal = _shouldCreateJournal(prompt);
         _addMessage(Message(text: prompt, isUser: true));
-        setState(() { _isLoading = true; });
         // Build transcript only when needed
         Future<void>? journalFuture;
         if (shouldJournal) {
@@ -202,6 +205,8 @@ class _HomeState extends State<Home>
           unawaited(journalFuture);
         }
       } else {
+        // Image + prompt flow: mark loading at start so send button is disabled
+        setState(() { _isLoading = true; });
         if (_controller.text.isNotEmpty) {
           _addMessage(
               Message(text: _controller.text, isUser: true, image: image));
@@ -215,26 +220,23 @@ class _HomeState extends State<Home>
             // Fire-and-forget journal creation with attached local image
             unawaited(_createJournal(transcript, pickedImage: image));
           }
-          setState(() {
-            _isLoading = false;
-          });
         }
 
         final prompt = _controller.text.trim();
         final imagePart = await image!.readAsBytes();
         final mimetype = image?.mimeType ?? 'image/jpeg';
         if (_model == null) {
-          _addMessage(Message(text: 'Image+prompt not available: missing GOOGLE_API_KEY', isUser: false));
+          setState(() {
+            _addMessage(Message(text: 'Image+prompt not available: missing GOOGLE_API_KEY', isUser: false));
+            _isLoading = false;
+          });
         } else {
           final response = await _model!.generateContent([
           Content.multi([TextPart(prompt), DataPart(mimetype, imagePart)])
         ]);
-
         setState(() {
-          _addMessage(Message(text: response.text!, isUser: false));
-          setState(() {
-            _isLoading = false;
-          });
+          _addMessage(Message(text: response.text ?? '', isUser: false));
+          _isLoading = false;
         });
         }
       }
@@ -247,6 +249,7 @@ class _HomeState extends State<Home>
     } catch (e) {
       //developer.log("Error : $e");
       _addMessage(Message(text: "Error : $e", isUser: false));
+      setState(() { _isLoading = false; });
     }
   }
 
