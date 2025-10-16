@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:hackathon_x_project/backend/event_model.dart';
-import 'package:hackathon_x_project/backend/message_to_event.dart';
 import 'package:hackathon_x_project/page/journalpage.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
@@ -32,8 +31,7 @@ class _NewcalendarState extends State<Newcalendar> {
   @override
   void initState() {
     super.initState();
-    // Analyze messages and create events when the widget is initialized
-    analyzeMessagesAndCreateEvent(context);
+    // Removed legacy auto-analysis; events now come from journaling flow
   }
 
   // Build a day cell with an emoji overlay if present for that date

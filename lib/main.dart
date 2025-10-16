@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hackathon_x_project/backend/colour.dart';
 import 'package:hackathon_x_project/backend/message_provider.dart';
-import 'package:hackathon_x_project/backend/being_agent_service.dart';
 import 'package:hackathon_x_project/page/onboardingscreen.dart';
 import 'package:provider/provider.dart';
 
@@ -14,15 +13,7 @@ void main() async {
   // Load environment variables from the .env file.
   await dotenv.load(fileName: ".env");
 
-  // Initialize Being Agent Service
-  print('Initializing Being Agent Service...');
-  bool agentServiceReady = await BeingAgentService.initialize();
-  if (agentServiceReady) {
-    print('✅ Being Agent Service is ready - Google Gemini API replacement active');
-  } else {
-    print('⚠️ Being Agent Service not available - check if agent server is running');
-    print('   Start agent server with: python agent/flask_server.py');
-  }
+  // Backend service initialization removed (not needed for app startup)
 
   // Run the Flutter application.
   runApp(
@@ -43,6 +34,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       // Set the theme for the application.
       theme: ThemeData(
         scaffoldBackgroundColor: background,

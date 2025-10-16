@@ -48,10 +48,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:http/http.dart' as http;
 import 'package:hackathon_x_project/backend/colour.dart';
-import 'package:hackathon_x_project/page/agent_test_screen.dart';
 import 'package:hackathon_x_project/widget/inventory.dart';
 import 'package:hackathon_x_project/backend/message.dart';
 import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
@@ -88,7 +86,6 @@ class _HomeState extends State<Home>
   ];
   bool _isEating = false;
 
-  GenerativeModel? _model;
   late final String _backendBaseUrl;
   late final String _userId;
   final ConversationBuffer _convBuffer = ConversationBuffer();
@@ -140,7 +137,9 @@ class _HomeState extends State<Home>
         'emoji': emojiPath,
       };
       debugPrint('addEventDetail => ' + jsonEncode(preview));
-      final snippet = description.length > 120 ? description.substring(0, 120) + '...' : description;
+      final snippet = description.length > 120
+          ? description.substring(0, 120) + '...'
+          : description;
       _addMessage(Message(
         text: 'Journal saved: ' + title + '\n' + time + ' • ' + parsedDate.toIso8601String() + '\n' + snippet,
         isUser: false,
@@ -176,66 +175,51 @@ class _HomeState extends State<Home>
 
   callGeminiModel() async {
     try {
-      //developer.log("callGeminiModel was run");
+      // Prevent re-entrancy while a request is in-flight
+      if (_isLoading) return;
       if (image == null) {
         if (_controller.text.isEmpty) return;
+        setState(() { _isLoading = true; });
         final prompt = _controller.text.trim();
         // Track user text for journaling
         _convBuffer.addUser(prompt);
         final shouldJournal = _shouldCreateJournal(prompt);
         _addMessage(Message(text: prompt, isUser: true));
-        setState(() { _isLoading = true; });
-        // Build transcript only when needed
-        Future<void>? journalFuture;
+        // If journaling is requested, skip calling chat temporarily
         if (shouldJournal) {
           final transcript = _convBuffer.toJournalText(maxMessages: 50, maxChars: 8000);
-          journalFuture = _createJournal(transcript);
-        }
-        // Always call chat
-        final agentReply = await _sendToAgent(prompt);
-        setState(() {
-          _addMessage(Message(text: agentReply, isUser: false));
-          _isLoading = false;
-        });
-        // Let journal complete in background
-        if (journalFuture != null) {
-          unawaited(journalFuture);
+          // Let journaling run in background; journal confirmation will appear when done
+          unawaited(_createJournal(transcript));
+          setState(() { _isLoading = false; });
+        } else {
+          // Call chat only when not journaling
+          final agentReply = await _sendToAgent(prompt);
+          setState(() {
+            _addMessage(Message(text: agentReply, isUser: false));
+            _isLoading = false;
+          });
         }
       } else {
+        // Image + prompt flow: use backend chat; local image only affects journaling UI
+        setState(() { _isLoading = true; });
         if (_controller.text.isNotEmpty) {
-          _addMessage(
-              Message(text: _controller.text, isUser: true, image: image));
-          // Track user text for journaling (image+prompt path)
+          _addMessage(Message(text: _controller.text, isUser: true, image: image));
           _convBuffer.addUser(_controller.text.trim());
-          // Optional: trigger journal here too based on keywords
           final prompt = _controller.text.trim();
           final shouldJournal = _shouldCreateJournal(prompt);
           if (shouldJournal) {
             final transcript = _convBuffer.toJournalText(maxMessages: 50, maxChars: 8000);
-            // Fire-and-forget journal creation with attached local image
             unawaited(_createJournal(transcript, pickedImage: image));
+            setState(() { _isLoading = false; });
+          } else {
+            final agentReply = await _sendToAgent(prompt);
+            setState(() {
+              _addMessage(Message(text: agentReply, isUser: false));
+              _isLoading = false;
+            });
           }
-          setState(() {
-            _isLoading = false;
-          });
-        }
-
-        final prompt = _controller.text.trim();
-        final imagePart = await image!.readAsBytes();
-        final mimetype = image?.mimeType ?? 'image/jpeg';
-        if (_model == null) {
-          _addMessage(Message(text: 'Image+prompt not available: missing GOOGLE_API_KEY', isUser: false));
         } else {
-          final response = await _model!.generateContent([
-          Content.multi([TextPart(prompt), DataPart(mimetype, imagePart)])
-        ]);
-
-        setState(() {
-          _addMessage(Message(text: response.text!, isUser: false));
-          setState(() {
-            _isLoading = false;
-          });
-        });
+          setState(() { _isLoading = false; });
         }
       }
 
@@ -245,8 +229,8 @@ class _HomeState extends State<Home>
       });
       _scrollToBottom();
     } catch (e) {
-      //developer.log("Error : $e");
       _addMessage(Message(text: "Error : $e", isUser: false));
+      setState(() { _isLoading = false; });
     }
   }
 
@@ -322,13 +306,6 @@ class _HomeState extends State<Home>
   void initState() {
     _backendBaseUrl = dotenv.env['BACKEND_BASE_URL'] ?? (Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000');
     _userId = dotenv.env['USER_ID'] ?? 'u1';
-    // Keep GenerativeModel for image+prompt generation path (backend currently text-only)
-    final apiKey = dotenv.env['GOOGLE_API_KEY'];
-    if (apiKey != null && apiKey.isNotEmpty) {
-      _model = GenerativeModel(model: 'gemini-2.0-flash', apiKey: apiKey);
-    } else {
-      _model = null;
-    }
 
     tabController = TabController(length: 3, vsync: this);
 
@@ -793,22 +770,7 @@ class _HomeState extends State<Home>
                     ),
                   ),
                 ),
-          Positioned(
-            top: 40,
-            left: 16,
-            child: FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const AgentTestScreen()),
-                );
-              },
-              backgroundColor: Colors.blue,
-              child: const Icon(Icons.psychology, color: Colors.white),
-              tooltip: 'Test Being Agent',
-            ),
-          ),
+          // Removed AgentTestScreen FAB
         ],
       ),
     );

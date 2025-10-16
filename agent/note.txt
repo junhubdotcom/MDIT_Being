@@ -1,5 +1,0 @@
-Try insert subagent and agent in one agent.py
-
-Tools in tools.py
-
-reference: https://github.com/google/adk-samples/blob/main/python/agents/google-trends-agent/google_trends_agent/agent.py
